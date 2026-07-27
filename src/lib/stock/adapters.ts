@@ -10,18 +10,22 @@ export interface PollResult {
 }
 
 const UA =
-  "PokeStatsBot/1.0 (+https://github.com/pokestats; respectful stock availability checks; contact via repo)";
+  "PokeStatsBot/1.0 (+https://github.com/cliclye/pokestats; respectful stock availability checks)";
 
-async function fetchText(url: string, init?: RequestInit): Promise<{ ok: boolean; status: number; text: string }> {
+async function fetchText(
+  url: string,
+  init?: RequestInit,
+): Promise<{ ok: boolean; status: number; text: string }> {
   try {
     const res = await fetch(url, {
       ...init,
       headers: {
         "User-Agent": UA,
         Accept: "application/json,text/html;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
         ...(init?.headers || {}),
       },
-      signal: AbortSignal.timeout(12000),
+      signal: AbortSignal.timeout(14000),
       redirect: "follow",
     });
     const text = await res.text();
@@ -38,7 +42,9 @@ function inferFromHtml(html: string): StockStatus {
     lower.includes("sold out") ||
     lower.includes("currently unavailable") ||
     lower.includes('"availability":"outofstock"') ||
-    lower.includes("not available")
+    lower.includes('"availability":"https://schema.org/outofstock"') ||
+    lower.includes("not available") ||
+    lower.includes("we don't know when or if this item will be back")
   ) {
     return "out";
   }
@@ -46,12 +52,14 @@ function inferFromHtml(html: string): StockStatus {
     lower.includes("add to cart") ||
     lower.includes("add to bag") ||
     lower.includes('"availability":"instock"') ||
+    lower.includes('"availability":"https://schema.org/instock"') ||
     lower.includes("in stock") ||
-    lower.includes("ship it")
+    lower.includes("ship it") ||
+    lower.includes("ships to")
   ) {
     return "in_stock";
   }
-  if (lower.includes("limited") || lower.includes("only a few left")) {
+  if (lower.includes("limited") || lower.includes("only a few left") || lower.includes("preorder") || lower.includes("pre-order")) {
     return "limited";
   }
   return "unknown";
@@ -61,12 +69,22 @@ function inferFromHtml(html: string): StockStatus {
 export async function pollTarget(product: TrackedProduct): Promise<PollResult> {
   const tcin = product.retailerSkus.target;
   if (!tcin) {
+    if (product.retailerUrls.target) {
+      const page = await fetchText(product.retailerUrls.target);
+      return {
+        retailerSlug: "target",
+        productId: product.id,
+        status: page.ok ? inferFromHtml(page.text) : "unknown",
+        quantity: null,
+        ok: page.ok,
+        note: page.ok ? "html_search" : `blocked:${page.status}`,
+      };
+    }
     return { retailerSlug: "target", productId: product.id, status: "unknown", quantity: null, ok: false, note: "no sku" };
   }
   const url = `https://redsky.target.com/redsky_aggregations/v1/web/product_fulfillment_v1?key=ff457966e64d5e877fdbad070f276d18ecec4a01&tcin=${tcin}&store_id=3991&zip=10001`;
   const res = await fetchText(url);
   if (!res.ok) {
-    // Fall back to product page HTML signal
     const page = product.retailerUrls.target
       ? await fetchText(product.retailerUrls.target)
       : res;
@@ -101,11 +119,10 @@ export async function pollTarget(product: TrackedProduct): Promise<PollResult> {
     if (status === "unknown" && product.retailerUrls.target) {
       const page = await fetchText(product.retailerUrls.target);
       if (page.ok) {
-        const inferred = inferFromHtml(page.text);
         return {
           retailerSlug: "target",
           productId: product.id,
-          status: inferred,
+          status: inferFromHtml(page.text),
           quantity: null,
           ok: true,
           note: raw ? `${raw}+html` : "html_fallback",
@@ -119,7 +136,6 @@ export async function pollTarget(product: TrackedProduct): Promise<PollResult> {
   }
 }
 
-/** Walmart product page / runtime signals */
 export async function pollWalmart(product: TrackedProduct): Promise<PollResult> {
   const url = product.retailerUrls.walmart;
   if (!url) {
@@ -153,18 +169,10 @@ export async function pollPokemonCenter(product: TrackedProduct): Promise<PollRe
 }
 
 export async function pollBestBuy(product: TrackedProduct): Promise<PollResult> {
-  const sku = product.retailerSkus["best-buy"];
-  if (!sku) {
-    return { retailerSlug: "best-buy", productId: product.id, status: "unknown", quantity: null, ok: false, note: "no sku" };
-  }
-  // Public availability endpoint used by Best Buy product pages
-  const url = `https://www.bestbuy.com/gateway/graphql`;
-  // Prefer product page HTML when GraphQL requires complex auth cookies
   const pageUrl = product.retailerUrls["best-buy"];
   if (!pageUrl) {
     return { retailerSlug: "best-buy", productId: product.id, status: "unknown", quantity: null, ok: false, note: "no url" };
   }
-  void url;
   const res = await fetchText(pageUrl);
   return {
     retailerSlug: "best-buy",
@@ -192,33 +200,67 @@ export async function pollGameStop(product: TrackedProduct): Promise<PollResult>
   };
 }
 
-const ADAPTERS: Record<
-  Exclude<RetailerSlug, "vending" | "amazon">,
-  (p: TrackedProduct) => Promise<PollResult>
-> = {
+export async function pollAmazon(product: TrackedProduct): Promise<PollResult> {
+  const url = product.retailerUrls.amazon;
+  if (!url) {
+    return { retailerSlug: "amazon", productId: product.id, status: "unknown", quantity: null, ok: false, note: "no url" };
+  }
+  const res = await fetchText(url);
+  return {
+    retailerSlug: "amazon",
+    productId: product.id,
+    status: res.ok ? inferFromHtml(res.text) : "unknown",
+    quantity: null,
+    ok: res.ok,
+    note: res.ok ? "html" : `blocked:${res.status}`,
+  };
+}
+
+const ADAPTERS: Partial<Record<RetailerSlug, (p: TrackedProduct) => Promise<PollResult>>> = {
   target: pollTarget,
   walmart: pollWalmart,
   "pokemon-center": pollPokemonCenter,
   "best-buy": pollBestBuy,
   gamestop: pollGameStop,
+  amazon: pollAmazon,
 };
+
+async function mapPool<T, R>(
+  items: T[],
+  concurrency: number,
+  worker: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let next = 0;
+  async function run() {
+    while (next < items.length) {
+      const i = next++;
+      results[i] = await worker(items[i]);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, () => run()));
+  return results;
+}
 
 export async function pollAllProducts(
   products: TrackedProduct[],
-  delayMs = 1500,
+  delayMs = 800,
 ): Promise<PollResult[]> {
-  const results: PollResult[] = [];
+  const tasks: Array<{ product: TrackedProduct; slug: RetailerSlug }> = [];
   for (const product of products) {
-    for (const [slug, adapter] of Object.entries(ADAPTERS) as Array<
-      [Exclude<RetailerSlug, "vending" | "amazon">, (p: TrackedProduct) => Promise<PollResult>]
-    >) {
+    for (const slug of Object.keys(ADAPTERS) as RetailerSlug[]) {
+      if (!ADAPTERS[slug]) continue;
       if (!product.retailerSkus[slug] && !product.retailerUrls[slug]) continue;
-      const result = await adapter(product);
-      results.push(result);
-      await new Promise((r) => setTimeout(r, delayMs));
+      tasks.push({ product, slug });
     }
   }
-  return results;
+
+  return mapPool(tasks, 3, async ({ product, slug }) => {
+    const adapter = ADAPTERS[slug]!;
+    const result = await adapter(product);
+    if (delayMs > 0) await new Promise((r) => setTimeout(r, delayMs));
+    return result;
+  });
 }
 
 export function resultsToSnapshots(
@@ -227,11 +269,13 @@ export function resultsToSnapshots(
   onlineLocationIdByRetailer: Map<string, string>,
 ): StockSnapshot[] {
   const now = new Date().toISOString();
-  return results.map((r, i) => {
+  return results.map((r) => {
     const retailerId = retailerIdBySlug.get(r.retailerSlug) || "";
+    const locationId = onlineLocationIdByRetailer.get(retailerId) ?? null;
     return {
-      id: `snap-${Date.now()}-${i}`,
-      locationId: onlineLocationIdByRetailer.get(retailerId) ?? null,
+      // Stable id so repeated polls upsert instead of duplicating
+      id: `snap-online-${r.retailerSlug}-${r.productId}`,
+      locationId,
       productId: r.productId,
       retailerId,
       status: r.status,

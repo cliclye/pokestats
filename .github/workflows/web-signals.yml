@@ -1,17 +1,16 @@
-name: Stock Poller
+name: Web Signals Sync
 
 on:
   schedule:
-    # GitHub may delay free-tier schedules; still best frequent auto-check we can run for $0
-    - cron: "*/15 * * * *"
+    - cron: "*/10 * * * *"
   workflow_dispatch:
 
 jobs:
-  poll:
+  signals:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 5
     steps:
-      - name: Trigger production stock + web scrape job
+      - name: Scrape NowInStock + restock pages into Supabase
         env:
           APP_URL: ${{ secrets.APP_URL }}
           JOBS_SECRET: ${{ secrets.JOBS_SECRET }}
@@ -21,10 +20,9 @@ jobs:
             echo "Set APP_URL and JOBS_SECRET repo secrets"
             exit 1
           fi
-          echo "Running full stock job against $APP_URL"
-          curl -fsS --max-time 280 -X POST "$APP_URL/api/jobs/run" \
+          curl -fsS --max-time 120 -X POST "$APP_URL/api/jobs/run" \
             -H "Content-Type: application/json" \
             -H "x-jobs-secret: $JOBS_SECRET" \
-            -d '{"job":"stock"}'
+            -d '{"job":"signals"}'
           echo
-          echo "Stock auto-check complete"
+          echo "Web signals auto-check complete"

@@ -84,8 +84,10 @@ export function WebStockChecker() {
   });
   const [meta, setMeta] = useState<{
     webSignalsSyncedAt: string | null;
+    stockPolledAt?: string | null;
     pool: number;
     inStock: number;
+    autoCheck?: string;
   } | null>(null);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -97,7 +99,8 @@ export function WebStockChecker() {
   const [productId, setProductId] = useState("all");
   const [retailer, setRetailer] = useState("all");
   const [status, setStatus] = useState<"all" | "in_stock" | "out" | "limited">("all");
-  const [source, setSource] = useState("nowinstock.net");
+  const [source, setSource] = useState("all");
+  const [tick, setTick] = useState(0);
 
   const productChoices = useMemo(() => {
     let list = products;
@@ -105,6 +108,11 @@ export function WebStockChecker() {
     if (setCode !== "all") list = list.filter((p) => p.setCode === setCode);
     return list;
   }, [products, category, setCode]);
+
+  useEffect(() => {
+    const id = setInterval(() => setTick((t) => t + 1), 60_000);
+    return () => clearInterval(id);
+  }, []);
 
   useEffect(() => {
     const params = new URLSearchParams();
@@ -131,8 +139,10 @@ export function WebStockChecker() {
         setFacets(json.facets || { categories: [], sets: [], retailers: [], sources: [] });
         setMeta({
           webSignalsSyncedAt: json.meta?.webSignalsSyncedAt ?? null,
+          stockPolledAt: json.meta?.stockPolledAt ?? null,
           pool: json.meta?.pool ?? 0,
           inStock: json.meta?.inStock ?? 0,
+          autoCheck: json.meta?.autoCheck,
         });
         setError(null);
       } catch (e) {
@@ -141,13 +151,29 @@ export function WebStockChecker() {
       }
     });
     return () => controller.abort();
-  }, [deferredQ, category, setCode, productId, retailer, status, source]);
+  }, [deferredQ, category, setCode, productId, retailer, status, source, tick]);
 
   const cats = categoryOptions();
 
   return (
     <div className="mx-auto w-full max-w-6xl px-5 pb-16 md:px-8">
       <div className="panel rounded-3xl p-4 md:p-5">
+        <div className="mb-4 rounded-2xl border border-[rgba(92,255,176,0.22)] bg-[rgba(92,255,176,0.06)] px-4 py-3 text-sm text-[var(--fog)]">
+          <p className="font-medium text-[var(--electric)]">Automatic stock checks are on</p>
+          <p className="mt-1 text-[var(--muted)]">
+            {meta?.autoCheck ||
+              "Retailer websites and NowInStock are scraped on a schedule — you don’t need to fill the report form for online stock."}
+          </p>
+          <p className="mt-1 text-xs text-[var(--muted)]">
+            Last web scrape:{" "}
+            {meta?.webSignalsSyncedAt
+              ? new Date(meta.webSignalsSyncedAt).toLocaleString()
+              : "—"}
+            {" · "}
+            Last retailer poll:{" "}
+            {meta?.stockPolledAt ? new Date(meta.stockPolledAt).toLocaleString() : "—"}
+          </p>
+        </div>
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <p className="text-xs uppercase tracking-[0.2em] text-[var(--electric-dim)]">
@@ -161,13 +187,7 @@ export function WebStockChecker() {
             <p>
               {meta?.inStock ?? 0} in stock / limited · {meta?.pool ?? 0} sealed listings
             </p>
-            <p>
-              Synced{" "}
-              {meta?.webSignalsSyncedAt
-                ? new Date(meta.webSignalsSyncedAt).toLocaleString()
-                : "—"}
-              {pending ? " · updating…" : ""}
-            </p>
+            <p>{pending ? "Updating…" : "Auto-refreshes every minute"}</p>
           </div>
         </div>
 
@@ -276,10 +296,11 @@ export function WebStockChecker() {
 
         <div className="mt-3 flex flex-wrap gap-2">
           {[
-            { id: "nowinstock.net", label: "NowInStock" },
             { id: "all", label: "All sources" },
+            { id: "auto-poll", label: "Direct site poll" },
+            { id: "nowinstock.net", label: "NowInStock" },
             ...facets.sources
-              .filter((s) => s !== "nowinstock.net")
+              .filter((s) => s !== "nowinstock.net" && s !== "auto-poll")
               .map((s) => ({ id: s, label: s })),
           ].map((s) => {
             const active = source === s.id;

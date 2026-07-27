@@ -271,7 +271,6 @@ export function signalsToSnapshots(
   );
   const now = new Date().toISOString();
   const snaps: StockSnapshot[] = [];
-  let i = 0;
 
   for (const s of signals) {
     if (!s.retailerSlug || s.status === "unknown") continue;
@@ -282,7 +281,7 @@ export function signalsToSnapshots(
     const locationId = onlineByRetailer.get(retailerId) ?? null;
 
     snaps.push({
-      id: `snap-web-${Date.now()}-${i++}`,
+      id: `snap-web-${s.retailerSlug}-${productId}`,
       locationId,
       productId,
       retailerId,

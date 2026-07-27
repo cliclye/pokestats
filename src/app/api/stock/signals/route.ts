@@ -31,8 +31,10 @@ export async function GET(request: Request) {
 
   const store = await readStore();
   const products = store.products || [];
+  const productById = new Map(products.map((p) => [p.id, p]));
+  const retailerById = new Map(store.retailers.map((r) => [r.id, r]));
 
-  let signals: EnrichedWebSignal[] = (store.webSignals || []).map((s) => {
+  const fromWeb: EnrichedWebSignal[] = (store.webSignals || []).map((s) => {
     const meta = enrichSignalName(s.productName, products);
     return {
       ...s,
@@ -44,10 +46,43 @@ export async function GET(request: Request) {
     };
   });
 
+  // Automatic direct retailer polls (no community form needed)
+  const fromPolls: EnrichedWebSignal[] = (store.snapshots || [])
+    .filter((s) => s.source === "online_poll")
+    .map((s) => {
+      const product = productById.get(s.productId);
+      const retailer = retailerById.get(s.retailerId);
+      const name = product?.name || s.note || s.productId;
+      const meta = enrichSignalName(name, products);
+      const slug = retailer?.slug || null;
+      const url =
+        (slug && product?.retailerUrls?.[slug as keyof typeof product.retailerUrls]) ||
+        null;
+      return {
+        id: s.id,
+        sourceSite: "auto-poll",
+        title: `${name} — ${slug || "retailer"} ${s.status}`,
+        url,
+        retailerSlug: slug,
+        productId: s.productId,
+        productName: name,
+        status: s.status,
+        observedAt: s.checkedAt,
+        raw: s.note || "online_poll",
+        category: (product?.category as ProductCategory) || meta.category,
+        setCode: product?.setCode || meta.setCode,
+        setLabel: meta.setLabel,
+        matchedProductName: product?.name || meta.matchedProductName,
+      };
+    });
+
+  let signals: EnrichedWebSignal[] = [...fromPolls, ...fromWeb];
+
   // Default: focus on sealed product listings from retailer sites (drop noisy forum posts)
   if (sealedOnly) {
     signals = signals.filter(
       (s) =>
+        s.sourceSite === "auto-poll" ||
         looksLikeSealedProduct(s.productName) ||
         Boolean(s.productId) ||
         s.sourceSite === "nowinstock.net",
@@ -97,25 +132,18 @@ export async function GET(request: Request) {
     .slice(0, limit);
 
   // Facets from full enriched pool (pre slice, post sealed filter)
-  const facetPool: EnrichedWebSignal[] = (store.webSignals || [])
-    .map((s) => {
-      const meta = enrichSignalName(s.productName, products);
-      return {
-        ...s,
-        productId: s.productId || meta.productId,
-        category: meta.category,
-        setCode: meta.setCode,
-        setLabel: meta.setLabel,
-        matchedProductName: meta.matchedProductName,
-      };
-    })
-    .filter((s) => {
-      if (!sealedOnly) return true;
-      if (s.sourceSite.includes("reddit")) {
-        return looksLikeSealedProduct(s.productName) || Boolean(s.matchedProductName);
-      }
-      return looksLikeSealedProduct(s.productName) || Boolean(s.productId) || s.sourceSite === "nowinstock.net";
-    });
+  const facetPool: EnrichedWebSignal[] = [...fromPolls, ...fromWeb].filter((s) => {
+    if (!sealedOnly) return true;
+    if (s.sourceSite === "auto-poll") return true;
+    if (s.sourceSite.includes("reddit")) {
+      return looksLikeSealedProduct(s.productName) || Boolean(s.matchedProductName);
+    }
+    return (
+      looksLikeSealedProduct(s.productName) ||
+      Boolean(s.productId) ||
+      s.sourceSite === "nowinstock.net"
+    );
+  });
 
   const setMap = new Map<string, string>();
   const catSet = new Set<ProductCategory>();
@@ -151,7 +179,10 @@ export async function GET(request: Request) {
       stockPolledAt: store.meta.stockPolledAt,
       total: signals.length,
       pool: facetPool.length,
-      inStock: facetPool.filter((s) => s.status === "in_stock" || s.status === "limited").length,
+      inStock: facetPool.filter((s) => s.status === "in_stock" || s.status === "limited")
+        .length,
+      autoCheck:
+        "Retailer sites + NowInStock are polled automatically about every 10–15 minutes. In-store shelves/vending still need a visit or community report.",
     },
   });
 }

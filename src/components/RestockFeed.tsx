@@ -48,8 +48,8 @@ export function RestockFeed({
   return (
     <div className="panel pointer-events-auto mt-2 max-h-56 w-full max-w-md overflow-hidden rounded-2xl">
       <div className="flex items-center justify-between border-b border-[var(--stroke)] px-3 py-2">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--electric)]">
-          Live web stock
+        <p className="text-xs uppercase tracking-[0.16em] text-[var(--electric)]">
+          Live web stock · auto
         </p>
         <p className="text-[10px] text-[var(--muted)]">
           {syncedAt ? new Date(syncedAt).toLocaleTimeString() : "—"}

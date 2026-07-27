@@ -207,7 +207,8 @@ export async function scrapeNowInStock(
     if (!retailerSlug) continue;
     if (/ebay/i.test(text) && retailerSlug !== "amazon") continue;
 
-    // Include index/hash salt so identical names across duplicate HTML rows stay unique
+    const productId = matchProduct(productName, products);
+    // Include URL in id salt so identical names across duplicate HTML rows stay unique
     const buyUrl = pickBuyUrl(hrefs, retailerSlug, productId, productName, products);
     const id = `nis-${simpleHash(`${productName}|${retailerSlug}|${status}|${buyUrl || hrefs[0] || ""}`)}`;
     if (signals.some((s) => s.id === id)) continue;

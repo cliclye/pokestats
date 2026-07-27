@@ -6,21 +6,33 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "sync:prices": "tsx jobs/prices/run.ts",
+    "sync:stock": "tsx jobs/stock/run.ts",
+    "sync:signals": "tsx jobs/stock/web-signals.ts",
+    "seed": "tsx scripts/seed-store.ts",
+    "push:supabase": "tsx scripts/push-supabase.ts",
+    "import:locations": "tsx scripts/import-locations.ts",
+    "import:locations:osm": "python3 scripts/import_osm.py",
+    "postinstall": "cp node_modules/maplibre-gl/dist/maplibre-gl-worker.mjs public/maplibre-gl-worker.mjs && cp node_modules/maplibre-gl/dist/maplibre-gl-shared.mjs public/maplibre-gl-shared.mjs"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.110.8",
+    "maplibre-gl": "^6.0.0",
     "next": "16.2.12",
     "react": "19.2.4",
     "react-dom": "19.2.4"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/maplibre-gl": "^1.13.2",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.12",
     "tailwindcss": "^4",
+    "tsx": "^4.23.1",
     "typescript": "^5"
   }
 }

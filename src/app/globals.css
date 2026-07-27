@@ -1,26 +1,178 @@
 @import "tailwindcss";
+@import "maplibre-gl/dist/maplibre-gl.css";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --ink: #07120e;
+  --ink-2: #0d1f18;
+  --felt: #12352a;
+  --felt-glow: #1a4d3c;
+  --electric: #5cffb0;
+  --electric-dim: #2a9b6e;
+  --amber: #ffc857;
+  --coral: #ff6b4a;
+  --fog: #c8d9d0;
+  --muted: #7a9688;
+  --panel: rgba(8, 22, 17, 0.82);
+  --stroke: rgba(92, 255, 176, 0.18);
+  --background: var(--ink);
+  --foreground: var(--fog);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-ink: var(--ink);
+  --color-felt: var(--felt);
+  --color-electric: var(--electric);
+  --color-amber: var(--amber);
+  --color-coral: var(--coral);
+  --color-fog: var(--fog);
+  --color-muted: var(--muted);
+  --font-sans: var(--font-body);
+  --font-display: var(--font-display);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background:
+    radial-gradient(ellipse 80% 50% at 20% -10%, rgba(92, 255, 176, 0.12), transparent 50%),
+    radial-gradient(ellipse 60% 40% at 90% 10%, rgba(255, 200, 87, 0.08), transparent 45%),
+    linear-gradient(165deg, var(--ink) 0%, var(--ink-2) 45%, #0a1a14 100%);
+  color: var(--fog);
+  font-family: var(--font-body), system-ui, sans-serif;
+  min-height: 100%;
+}
+
+::selection {
+  background: rgba(92, 255, 176, 0.35);
+  color: #04110c;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.font-display {
+  font-family: var(--font-display), Georgia, serif;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--stroke);
+  backdrop-filter: blur(14px);
+}
+
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background: var(--electric);
+  color: #042016;
+  font-weight: 700;
+  padding: 0.85rem 1.4rem;
+  border-radius: 999px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+  box-shadow: 0 0 0 0 rgba(92, 255, 176, 0.4);
+}
+
+.btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 28px rgba(92, 255, 176, 0.25);
+  background: #7dffc0;
+}
+
+.btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border: 1px solid var(--stroke);
+  color: var(--fog);
+  padding: 0.85rem 1.4rem;
+  border-radius: 999px;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.btn-ghost:hover {
+  border-color: rgba(92, 255, 176, 0.45);
+  background: rgba(92, 255, 176, 0.06);
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0 rgba(92, 255, 176, 0.45);
+  }
+  70% {
+    box-shadow: 0 0 0 12px rgba(92, 255, 176, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(92, 255, 176, 0);
+  }
+}
+
+.animate-rise {
+  animation: rise 0.7s ease both;
+}
+
+.animate-rise-delay {
+  animation: rise 0.8s ease 0.12s both;
+}
+
+.marker-pulse {
+  animation: pulse-ring 2s ease infinite;
+}
+
+.maplibregl-map {
+  width: 100%;
+  height: 100%;
+  font: inherit;
+}
+
+.maplibregl-canvas-container,
+.maplibregl-canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.maplibregl-popup-content {
+  background: #0c1c16 !important;
+  color: var(--fog) !important;
+  border: 1px solid var(--stroke) !important;
+  border-radius: 12px !important;
+  padding: 10px 12px !important;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45) !important;
+}
+
+.maplibregl-popup-tip {
+  border-top-color: #0c1c16 !important;
+}
+
+.maplibregl-ctrl-group {
+  background: #0c1c16 !important;
+  border: 1px solid var(--stroke) !important;
+}
+
+.maplibregl-ctrl button {
+  background-color: transparent !important;
 }

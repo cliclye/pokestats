@@ -1,65 +1,46 @@
-import Image from "next/image";
+import Link from "next/link";
+import { Nav } from "@/components/Nav";
 
-export default function Home() {
+export default function HomePage() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <div className="relative flex min-h-full flex-col overflow-hidden">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 opacity-40"
+        style={{
+          backgroundImage:
+            "radial-gradient(circle at 1px 1px, rgba(92,255,176,0.18) 1px, transparent 0)",
+          backgroundSize: "28px 28px",
+          maskImage: "linear-gradient(to bottom, black 20%, transparent 85%)",
+        }}
+      />
+      <Nav active="home" />
+      <main className="relative z-10 flex flex-1 flex-col justify-center px-5 pb-20 pt-10 md:px-10 md:pt-6">
+        <div className="mx-auto w-full max-w-5xl">
+          <p className="animate-rise text-xs uppercase tracking-[0.28em] text-[var(--electric-dim)]">
+            US retail · TCG market
           </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+          <h1 className="animate-rise font-display mt-4 max-w-3xl text-5xl leading-[0.95] tracking-tight text-[var(--fog)] md:text-7xl">
+            <span className="text-[var(--electric)]">PokeStats</span>
+          </h1>
+          <p className="animate-rise-delay mt-5 max-w-xl text-lg text-[var(--muted)] md:text-xl">
+            See what&apos;s on shelves and what cards are worth — stock map across retailers and
+            vending, prices from the TCG market.
+          </p>
+          <div className="animate-rise-delay mt-10 flex flex-wrap gap-3">
+            <Link href="/map" className="btn-primary">
+              Open stock map
+            </Link>
+            <Link href="/prices" className="btn-ghost">
+              Check card prices
+            </Link>
+          </div>
         </div>
       </main>
+      <footer className="relative z-10 px-5 py-6 text-xs text-[var(--muted)] md:px-10">
+        Online polls + community reports. Shelf and vending inventory are never guaranteed from
+        public data alone.
+      </footer>
     </div>
   );
 }

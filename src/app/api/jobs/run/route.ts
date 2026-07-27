@@ -98,7 +98,10 @@ export async function GET(request: Request) {
   } catch (err) {
     console.error("cron job failed", err);
     return NextResponse.json(
-      { error: "job_failed", message: String(err) },
+      {
+        error: "job_failed",
+        message: err instanceof Error ? err.message : JSON.stringify(err),
+      },
       { status: 500 },
     );
   }
@@ -123,7 +126,10 @@ export async function POST(request: Request) {
   } catch (err) {
     console.error("job failed", err);
     return NextResponse.json(
-      { error: "job_failed", message: String(err) },
+      {
+        error: "job_failed",
+        message: err instanceof Error ? err.message : JSON.stringify(err),
+      },
       { status: 500 },
     );
   }

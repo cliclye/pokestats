@@ -300,8 +300,20 @@ async function upsertChunked(
   const secret = jobsSecret();
   const useRpc = !process.env.SUPABASE_SERVICE_ROLE_KEY && Boolean(secret);
 
-  for (let i = 0; i < rows.length; i += chunkSize) {
-    const chunk = rows.slice(i, i + chunkSize);
+  // Deduplicate by primary key within each write batch (Postgres ON CONFLICT can't update same row twice)
+  const deduped = (() => {
+    if (!rows.length || !("id" in rows[0])) return rows;
+    const map = new Map<string, Record<string, unknown>>();
+    for (const row of rows) {
+      const id = String(row.id ?? "");
+      if (!id) continue;
+      map.set(id, row);
+    }
+    return [...map.values()];
+  })();
+
+  for (let i = 0; i < deduped.length; i += chunkSize) {
+    const chunk = deduped.slice(i, i + chunkSize);
     if (useRpc) {
       const { error } = await supabase.rpc("job_upsert_json", {
         p_secret: secret,

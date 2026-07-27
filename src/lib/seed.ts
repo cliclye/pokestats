@@ -48,6 +48,17 @@ export const PRODUCTS: TrackedProduct[] = [
     },
   },
   {
+    id: "p-sv8-bb",
+    name: "Surging Sparks Booster Box",
+    setCode: "sv8",
+    category: "booster_box",
+    retailerSkus: {},
+    retailerUrls: {
+      "pokemon-center": "https://www.pokemoncenter.com/category/new-releases",
+      amazon: "https://www.amazon.com/s?k=Surging+Sparks+Booster+Box",
+    },
+  },
+  {
     id: "p-sv7-etb",
     name: "Stellar Crown Elite Trainer Box",
     setCode: "sv7",
@@ -83,6 +94,84 @@ export const PRODUCTS: TrackedProduct[] = [
       "pokemon-center": "https://www.pokemoncenter.com/product/710-03301",
       "best-buy": "https://www.bestbuy.com/site/6611001.p",
       gamestop: "https://www.gamestop.com/toys-games/trading-cards/products/428901.html",
+    },
+  },
+  {
+    id: "p-prismatic-bundle",
+    name: "Prismatic Evolutions Booster Bundle",
+    setCode: "sv8pt5",
+    category: "booster_bundle",
+    retailerSkus: {},
+    retailerUrls: {
+      target: "https://www.target.com/s?searchTerm=prismatic+evolutions+booster+bundle",
+      walmart: "https://www.walmart.com/search?q=prismatic+evolutions+booster+bundle",
+      amazon: "https://www.amazon.com/s?k=Prismatic+Evolutions+Booster+Bundle",
+    },
+  },
+  {
+    id: "p-me-etb",
+    name: "Mega Evolution Elite Trainer Box",
+    setCode: "me1",
+    category: "etb",
+    retailerSkus: {},
+    retailerUrls: {
+      target: "https://www.target.com/s?searchTerm=mega+evolution+elite+trainer+box",
+      walmart: "https://www.walmart.com/search?q=mega+evolution+elite+trainer+box",
+      "pokemon-center": "https://www.pokemoncenter.com/category/new-releases",
+      amazon: "https://www.amazon.com/s?k=Mega+Evolution+Elite+Trainer+Box",
+    },
+  },
+  {
+    id: "p-me-bundle",
+    name: "Mega Evolution Perfect Order Booster Bundle",
+    setCode: "me1",
+    category: "booster_bundle",
+    retailerSkus: {},
+    retailerUrls: {
+      amazon: "https://www.amazon.com/s?k=Mega+Evolution+Perfect+Order+Booster+Bundle",
+      target: "https://www.target.com/s?searchTerm=mega+evolution+booster+bundle",
+    },
+  },
+  {
+    id: "p-me-bb",
+    name: "Mega Evolution Booster Box",
+    setCode: "me1",
+    category: "booster_box",
+    retailerSkus: {},
+    retailerUrls: {
+      "pokemon-center": "https://www.pokemoncenter.com/category/new-releases",
+      amazon: "https://www.amazon.com/s?k=Mega+Evolution+Booster+Box",
+    },
+  },
+  {
+    id: "p-151-etb",
+    name: "Scarlet & Violet 151 Elite Trainer Box",
+    setCode: "sv3pt5",
+    category: "etb",
+    retailerSkus: {},
+    retailerUrls: {
+      amazon: "https://www.amazon.com/s?k=Pokemon+151+Elite+Trainer+Box",
+      target: "https://www.target.com/s?searchTerm=pokemon+151+elite+trainer+box",
+    },
+  },
+  {
+    id: "p-paldean-etb",
+    name: "Paldean Fates Elite Trainer Box",
+    setCode: "sv4pt5",
+    category: "etb",
+    retailerSkus: {},
+    retailerUrls: {
+      amazon: "https://www.amazon.com/s?k=Paldean+Fates+Elite+Trainer+Box",
+    },
+  },
+  {
+    id: "p-shrouded-etb",
+    name: "Shrouded Fable Elite Trainer Box",
+    setCode: "sv6pt5",
+    category: "etb",
+    retailerSkus: {},
+    retailerUrls: {
+      amazon: "https://www.amazon.com/s?k=Shrouded+Fable+Elite+Trainer+Box",
     },
   },
 ];

@@ -15,9 +15,9 @@ const body = DM_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "PokeStats — Stock Map & Card Prices",
+  title: "PokeStats — Stock Map, Web Stock & Card Prices",
   description:
-    "Track Pokémon TCG retail stock across major sellers and look up live market prices by set or search.",
+    "Track Pokémon TCG retail stock on a map and across retailer websites, and look up live market prices by set or search.",
 };
 
 export default function RootLayout({

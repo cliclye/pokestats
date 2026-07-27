@@ -2,10 +2,15 @@ import Link from "next/link";
 
 const links = [
   { href: "/map", label: "Stock Map" },
+  { href: "/web-stock", label: "Web Stock" },
   { href: "/prices", label: "Prices" },
 ];
 
-export function Nav({ active }: { active?: "map" | "prices" | "home" }) {
+export function Nav({
+  active,
+}: {
+  active?: "map" | "web-stock" | "prices" | "home";
+}) {
   return (
     <header className="relative z-40 flex items-center justify-between gap-4 px-5 py-4 md:px-8">
       <Link href="/" className="group flex items-baseline gap-2">
@@ -20,6 +25,7 @@ export function Nav({ active }: { active?: "map" | "prices" | "home" }) {
         {links.map((l) => {
           const isActive =
             (active === "map" && l.href === "/map") ||
+            (active === "web-stock" && l.href === "/web-stock") ||
             (active === "prices" && l.href === "/prices");
           return (
             <Link

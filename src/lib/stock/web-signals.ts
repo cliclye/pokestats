@@ -185,6 +185,14 @@ export async function scrapeRedditSignals(
         if (!/\b(restock|in stock|just dropped|back in stock|sold out|out of stock)\b/i.test(blob)) {
           continue;
         }
+        // Require sealed-product language so random restock chatter is skipped
+        if (
+          !/\b(etb|elite trainer|booster box|booster bundle|tin|upc|collection box|battle deck)\b/i.test(
+            blob,
+          )
+        ) {
+          continue;
+        }
         const ageMs = post.created_utc ? Date.now() - post.created_utc * 1000 : Infinity;
         if (ageMs > 14 * 24 * 60 * 60 * 1000) continue;
 

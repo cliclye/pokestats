@@ -31,6 +31,9 @@ export default function HomePage() {
             <Link href="/map" className="btn-primary">
               Open stock map
             </Link>
+            <Link href="/web-stock" className="btn-ghost">
+              Web stock checker
+            </Link>
             <Link href="/prices" className="btn-ghost">
               Check card prices
             </Link>

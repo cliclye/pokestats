@@ -43,7 +43,7 @@ export interface TrackedProduct {
   id: string;
   name: string;
   setCode: string;
-  category: "etb" | "booster_bundle" | "tin" | "collection" | "other";
+  category: "etb" | "booster_bundle" | "booster_box" | "tin" | "collection" | "battle_deck" | "other";
   imageUrl?: string;
   retailerSkus: Partial<Record<RetailerSlug, string>>;
   retailerUrls: Partial<Record<RetailerSlug, string>>;

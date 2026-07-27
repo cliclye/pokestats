@@ -64,8 +64,20 @@ function statusFromClass(cls: string): StockStatus {
 
 function matchProduct(name: string, products: TrackedProduct[]): string | null {
   const n = name.toLowerCase();
+  const signalCat = (() => {
+    if (/\belite\s*trainer|\betb\b/.test(n)) return "etb";
+    if (/\bbooster\s*bundle\b/.test(n)) return "booster_bundle";
+    if (/\bbooster\s*box\b|\bdisplay\b/.test(n)) return "booster_box";
+    if (/\bblister|3-?\s*pack\b/.test(n)) return "collection";
+    if (/\btin\b/.test(n)) return "tin";
+    if (/\bbattle\s*deck\b/.test(n)) return "battle_deck";
+    if (/\bcollection|upc|ex\s*box\b/.test(n)) return "collection";
+    return null;
+  })();
+
   let best: { id: string; score: number } | null = null;
   for (const p of products) {
+    if (signalCat && p.category !== signalCat) continue;
     const tokens = p.name
       .toLowerCase()
       .replace(/[^a-z0-9\s]/g, " ")
@@ -73,7 +85,8 @@ function matchProduct(name: string, products: TrackedProduct[]): string | null {
       .filter((t) => t.length > 2 && !["the", "and", "box", "pokemon", "pokémon"].includes(t));
     const hits = tokens.filter((t) => n.includes(t)).length;
     const score = hits / Math.max(tokens.length, 1);
-    if (hits >= 2 && score >= 0.5) {
+    // Require strong overlap so blister packs don't steal booster-bundle URLs
+    if (hits >= 3 && score >= 0.7) {
       if (!best || score > best.score) best = { id: p.id, score };
     }
   }

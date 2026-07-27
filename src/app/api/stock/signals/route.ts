@@ -135,8 +135,16 @@ export async function GET(request: Request) {
       const rd = rank(a.status) - rank(b.status);
       if (rd !== 0) return rd;
       return b.observedAt.localeCompare(a.observedAt);
-    })
-    .slice(0, limit);
+    });
+
+  // Collapse duplicate product+retailer+status rows (auto-poll + scrape overlap)
+  const seen = new Set<string>();
+  signals = signals.filter((s) => {
+    const key = `${s.productName.toLowerCase()}|${s.retailerSlug}|${s.status}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).slice(0, limit);
 
   // Facets from full enriched pool (pre slice, post sealed filter)
   const facetPool: EnrichedWebSignal[] = [...fromPolls, ...fromWeb]

@@ -70,14 +70,76 @@ function matchProduct(name: string, products: TrackedProduct[]): string | null {
       .toLowerCase()
       .replace(/[^a-z0-9\s]/g, " ")
       .split(/\s+/)
-      .filter((t) => t.length > 2 && !["the", "and", "box"].includes(t));
+      .filter((t) => t.length > 2 && !["the", "and", "box", "pokemon", "pokémon"].includes(t));
     const hits = tokens.filter((t) => n.includes(t)).length;
     const score = hits / Math.max(tokens.length, 1);
-    if (hits >= 2 && score >= 0.45) {
+    if (hits >= 2 && score >= 0.5) {
       if (!best || score > best.score) best = { id: p.id, score };
     }
   }
   return best?.id ?? null;
+}
+
+function pickBuyUrl(
+  hrefs: string[],
+  retailerSlug: RetailerSlug | null,
+  productId: string | null,
+  productName: string,
+  products: TrackedProduct[],
+): string | null {
+  // Prefer our curated product URLs over NowInStock affiliate / deep links
+  if (productId && retailerSlug) {
+    const p = products.find((x) => x.id === productId);
+    const curated = p?.retailerUrls?.[retailerSlug];
+    if (curated) return curated;
+  }
+
+  for (const href of hrefs) {
+    try {
+      const u = new URL(href);
+      if (/mavely\.app\.link|bit\.ly|tinyurl|app\.link/i.test(u.hostname)) continue;
+      if (u.hostname.includes("skimresources") || u.hostname.includes("go.skim")) {
+        const inner = u.searchParams.get("url");
+        if (inner) {
+          const decoded = decodeURIComponent(inner);
+          if (/walmart\.com|target\.com|bestbuy|gamestop|amazon|pokemoncenter/i.test(decoded)) {
+            return decoded.split("?")[0];
+          }
+        }
+        continue;
+      }
+      if (/ebay\./i.test(u.hostname)) continue;
+      if (/amazon\.com/i.test(u.hostname)) {
+        const dp = u.pathname.match(/\/(?:dp|gp\/product)\/([A-Z0-9]{10})/i);
+        if (dp) return `https://www.amazon.com/dp/${dp[1]}`;
+      }
+      if (/target\.com|walmart\.com|bestbuy\.com|gamestop\.com|pokemoncenter\.com/i.test(u.hostname)) {
+        return `${u.origin}${u.pathname}`;
+      }
+    } catch {
+      // ignore bad urls
+    }
+  }
+
+  // Safe fallback: retailer search for this product name (never opaque short links)
+  if (!retailerSlug || !productName) return null;
+  const q = encodeURIComponent(`Pokemon ${productName}`);
+  switch (retailerSlug) {
+    case "target":
+      return `https://www.target.com/s?searchTerm=${q}`;
+    case "walmart":
+      return `https://www.walmart.com/search?q=${q}`;
+    case "best-buy":
+      return `https://www.bestbuy.com/site/searchpage.jsp?st=${q}`;
+    case "gamestop":
+      return `https://www.gamestop.com/search/?q=${q}`;
+    case "pokemon-center":
+      return `https://www.pokemoncenter.com/search/${encodeURIComponent(productName)}`;
+    case "amazon":
+      return `https://www.amazon.com/s?k=${q}`;
+    default:
+      return null;
+  }
 }
 
 export async function scrapeNowInStock(
@@ -110,25 +172,35 @@ export async function scrapeNowInStock(
     const parts = text.split(/\s+:\s+/);
     const productName = (parts[0] || text).trim();
     const rest = parts.slice(1).join(" : ");
-    const retailerSlug = parseRetailer(rest || text);
-    if (!retailerSlug && !/ebay/i.test(text)) {
-      // still keep unknown retailer signals that look like stock rows
-      if (!/\b(in stock|out of stock|pre-?order)\b/i.test(text)) continue;
+    if (/^ebay\b/i.test(productName)) continue;
+    // Skip accessories / non-sealed junk that pollutes "in stock"
+    if (
+      /\b(handbook|album|portfolio|binder|board\s*game|guessing|hot\s*wheels|diecast|plush|figure)\b/i.test(
+        productName,
+      )
+    ) {
+      continue;
     }
-    if (/ebay/i.test(text) && !retailerSlug) continue;
+    // Keep sealed TCG product types only
+    if (
+      !/\b(etb|elite\s*trainer|booster|bundle|blister|tin|collection|upc|battle\s*deck|build\s*(&|and)\s*battle|ex\s*box|display)\b/i.test(
+        productName,
+      )
+    ) {
+      continue;
+    }
+
+    const retailerSlug = parseRetailer(rest || text);
+    if (!retailerSlug) continue;
+    if (/ebay/i.test(text) && retailerSlug !== "amazon") continue;
 
     const productId = matchProduct(productName, products);
-    const buyUrl =
-      hrefs.find((h) =>
-        /target\.com|walmart\.com|bestbuy\.com|gamestop\.com|amazon\.com|pokemoncenter\.com/i.test(
-          h,
-        ),
-      ) || hrefs[0] || null;
+    const buyUrl = pickBuyUrl(hrefs, retailerSlug, productId, productName, products);
 
     signals.push({
       id: `nis-${simpleHash(`${productName}|${retailerSlug}|${status}`)}`,
       sourceSite: "nowinstock.net",
-      title: `${productName} — ${retailerSlug || "retailer"} ${status.replace("_", " ")}`,
+      title: `${productName} — ${retailerSlug} ${status.replace("_", " ")}`,
       url: buyUrl,
       retailerSlug,
       productId,
@@ -249,10 +321,13 @@ export async function collectWebSignals(
   } catch (err) {
     console.warn("NowInStock scrape failed:", err);
   }
-  try {
-    signals.push(...(await scrapeRedditSignals(products)));
-  } catch (err) {
-    console.warn("Reddit signal scrape failed:", err);
+  // Reddit archive is too noisy for product links — skip by default
+  if (process.env.ENABLE_REDDIT_SIGNALS === "1") {
+    try {
+      signals.push(...(await scrapeRedditSignals(products)));
+    } catch (err) {
+      console.warn("Reddit signal scrape failed:", err);
+    }
   }
 
   // de-dupe by id

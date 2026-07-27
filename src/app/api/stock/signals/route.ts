@@ -3,7 +3,9 @@ import { readStore } from "@/lib/store";
 import {
   CATEGORY_LABELS,
   enrichSignalName,
+  isCorePackOrBox,
   looksLikeSealedProduct,
+  unwrapAffiliateUrl,
   type ProductCategory,
 } from "@/lib/stock/product-taxonomy";
 import type { StockStatus, WebStockSignal } from "@/lib/types";
@@ -48,7 +50,7 @@ export async function GET(request: Request) {
 
   // Automatic direct retailer polls (no community form needed)
   const fromPolls: EnrichedWebSignal[] = (store.snapshots || [])
-    .filter((s) => s.source === "online_poll")
+    .filter((s) => s.source === "online_poll" && s.status !== "unknown")
     .map((s) => {
       const product = productById.get(s.productId);
       const retailer = retailerById.get(s.retailerId);
@@ -76,21 +78,26 @@ export async function GET(request: Request) {
       };
     });
 
-  let signals: EnrichedWebSignal[] = [...fromPolls, ...fromWeb];
+  let signals: EnrichedWebSignal[] = [...fromPolls, ...fromWeb]
+    .map((s) => ({
+      ...s,
+      url: unwrapAffiliateUrl(s.url) || s.url,
+    }))
+    // Drop opaque / junk links that previously sent users to unrelated pages
+    .filter((s) => {
+      if (!s.url) return true;
+      if (/mavely\.app\.link|bit\.ly|tinyurl|ebay\./i.test(s.url)) return false;
+      return true;
+    });
 
-  // Default: focus on sealed product listings from retailer sites (drop noisy forum posts)
+  // Default: only core sealed packs/boxes (ETB, booster, tin, collection) — no albums/handbooks/toys
   if (sealedOnly) {
-    signals = signals.filter(
-      (s) =>
-        s.sourceSite === "auto-poll" ||
-        looksLikeSealedProduct(s.productName) ||
-        Boolean(s.productId) ||
-        s.sourceSite === "nowinstock.net",
-    );
-    // Drop obvious non-product Reddit chatter
     signals = signals.filter((s) => {
-      if (!s.sourceSite.includes("reddit")) return true;
-      return looksLikeSealedProduct(s.productName) || Boolean(s.matchedProductName);
+      if (s.sourceSite.includes("reddit")) return false;
+      if (s.sourceSite === "auto-poll") {
+        return isCorePackOrBox(s.productName, s.category);
+      }
+      return isCorePackOrBox(s.productName, s.category) || looksLikeSealedProduct(s.productName);
     });
   }
 
@@ -132,18 +139,17 @@ export async function GET(request: Request) {
     .slice(0, limit);
 
   // Facets from full enriched pool (pre slice, post sealed filter)
-  const facetPool: EnrichedWebSignal[] = [...fromPolls, ...fromWeb].filter((s) => {
-    if (!sealedOnly) return true;
-    if (s.sourceSite === "auto-poll") return true;
-    if (s.sourceSite.includes("reddit")) {
-      return looksLikeSealedProduct(s.productName) || Boolean(s.matchedProductName);
-    }
-    return (
-      looksLikeSealedProduct(s.productName) ||
-      Boolean(s.productId) ||
-      s.sourceSite === "nowinstock.net"
-    );
-  });
+  const facetPool: EnrichedWebSignal[] = [...fromPolls, ...fromWeb]
+    .map((s) => ({
+      ...s,
+      url: unwrapAffiliateUrl(s.url) || s.url,
+    }))
+    .filter((s) => {
+      if (!sealedOnly) return true;
+      if (s.sourceSite.includes("reddit")) return false;
+      if (s.url && /mavely\.app\.link|ebay\./i.test(s.url)) return false;
+      return isCorePackOrBox(s.productName, s.category) || looksLikeSealedProduct(s.productName);
+    });
 
   const setMap = new Map<string, string>();
   const catSet = new Set<ProductCategory>();

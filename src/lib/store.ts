@@ -2,6 +2,7 @@ import { promises as fs } from "fs";
 import path from "path";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { createEmptyStore, PRODUCTS, RETAILERS } from "./seed";
+import { looksLikeSealedProduct } from "./stock/product-taxonomy";
 import type {
   AppStore,
   Card,
@@ -13,6 +14,10 @@ import type {
   TrackedProduct,
   WebStockSignal,
 } from "./types";
+
+function isImportableSignalName(name: string) {
+  return looksLikeSealedProduct(name);
+}
 
 const DATA_DIR = path.join(process.cwd(), "data");
 const STORE_PATH = path.join(DATA_DIR, "store.json");
@@ -428,10 +433,20 @@ export async function upsertWebSignals(
   const supabase = getSupabase();
   if (supabase && canWriteRemote()) {
     await ensureAmazonOnline(supabase);
+    try {
+      await supabase.rpc("job_cleanup_web_signals", {
+        p_secret: jobsSecret(),
+      });
+    } catch {
+      // cleanup is best-effort
+    }
+
     await upsertChunked(
       supabase,
       "web_signals",
-      signals.map((s) => ({
+      signals
+        .filter((s) => isImportableSignalName(s.productName))
+        .map((s) => ({
         id: s.id,
         source_site: s.sourceSite,
         title: s.title,
@@ -468,8 +483,11 @@ export async function upsertWebSignals(
 
   return updateStore((store) => {
     if (!store.webSignals) store.webSignals = [];
-    const byId = new Map(store.webSignals.map((s) => [s.id, s]));
-    for (const s of signals) byId.set(s.id, s);
+    // Replace NowInStock rows entirely so junk/accessory listings don't linger
+    const kept = store.webSignals.filter((s) => s.sourceSite !== "nowinstock.net");
+    const incoming = signals.filter((s) => isImportableSignalName(s.productName));
+    const byId = new Map(kept.map((s) => [s.id, s]));
+    for (const s of incoming) byId.set(s.id, s);
     store.webSignals = [...byId.values()]
       .sort((a, b) => b.observedAt.localeCompare(a.observedAt))
       .slice(0, 300);

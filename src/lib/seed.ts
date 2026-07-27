@@ -11,6 +11,167 @@ export const RETAILERS: Retailer[] = [
 ];
 
 export const PRODUCTS: TrackedProduct[] = [
+  // Newest Mega Evolution block
+  {
+    id: "p-me5-etb",
+    name: "Pitch Black Elite Trainer Box",
+    setCode: "me5",
+    category: "etb",
+    retailerUrls: {
+      target: "https://www.target.com/s?searchTerm=pokemon+pitch+black+elite+trainer+box",
+      walmart: "https://www.walmart.com/search?q=pokemon+pitch+black+elite+trainer+box",
+      "pokemon-center": "https://www.pokemoncenter.com/search/pitch%20black%20elite%20trainer",
+      "best-buy": "https://www.bestbuy.com/site/searchpage.jsp?st=pokemon+pitch+black+elite+trainer+box",
+      gamestop: "https://www.gamestop.com/search/?q=pitch+black+elite+trainer+box",
+      amazon: "https://www.amazon.com/s?k=Pokemon+Pitch+Black+Elite+Trainer+Box",
+    },
+    retailerSkus: {},
+  },
+  {
+    id: "p-me5-bundle",
+    name: "Pitch Black Booster Bundle",
+    setCode: "me5",
+    category: "booster_bundle",
+    retailerSkus: {},
+    retailerUrls: {
+      amazon: "https://www.amazon.com/s?k=Pokemon+Pitch+Black+Booster+Bundle",
+      target: "https://www.target.com/s?searchTerm=pokemon+pitch+black+booster+bundle",
+      walmart: "https://www.walmart.com/search?q=pokemon+pitch+black+booster+bundle",
+    },
+  },
+  {
+    id: "p-me5-bb",
+    name: "Pitch Black Booster Box",
+    setCode: "me5",
+    category: "booster_box",
+    retailerSkus: {},
+    retailerUrls: {
+      amazon: "https://www.amazon.com/s?k=Pokemon+Pitch+Black+Booster+Box",
+      "pokemon-center": "https://www.pokemoncenter.com/search/pitch%20black%20booster%20box",
+    },
+  },
+  {
+    id: "p-me4-etb",
+    name: "Chaos Rising Elite Trainer Box",
+    setCode: "me4",
+    category: "etb",
+    retailerSkus: {},
+    retailerUrls: {
+      target: "https://www.target.com/s?searchTerm=pokemon+chaos+rising+elite+trainer+box",
+      walmart: "https://www.walmart.com/search?q=pokemon+chaos+rising+elite+trainer+box",
+      "pokemon-center": "https://www.pokemoncenter.com/search/chaos%20rising%20elite%20trainer",
+      "best-buy": "https://www.bestbuy.com/site/searchpage.jsp?st=pokemon+chaos+rising+elite+trainer+box",
+      gamestop: "https://www.gamestop.com/search/?q=chaos+rising+elite+trainer+box",
+      amazon: "https://www.amazon.com/s?k=Pokemon+Chaos+Rising+Elite+Trainer+Box",
+    },
+  },
+  {
+    id: "p-me4-bundle",
+    name: "Chaos Rising Booster Bundle",
+    setCode: "me4",
+    category: "booster_bundle",
+    retailerSkus: {},
+    retailerUrls: {
+      amazon: "https://www.amazon.com/s?k=Pokemon+Chaos+Rising+Booster+Bundle",
+      target: "https://www.target.com/s?searchTerm=pokemon+chaos+rising+booster+bundle",
+      walmart: "https://www.walmart.com/search?q=pokemon+chaos+rising+booster+bundle",
+    },
+  },
+  {
+    id: "p-me4-bb",
+    name: "Chaos Rising Booster Box",
+    setCode: "me4",
+    category: "booster_box",
+    retailerSkus: {},
+    retailerUrls: {
+      amazon: "https://www.amazon.com/s?k=Pokemon+Chaos+Rising+Booster+Box",
+      "pokemon-center": "https://www.pokemoncenter.com/search/chaos%20rising%20booster%20box",
+    },
+  },
+  {
+    id: "p-me3-etb",
+    name: "Perfect Order Elite Trainer Box",
+    setCode: "me3",
+    category: "etb",
+    retailerSkus: {},
+    retailerUrls: {
+      amazon: "https://www.amazon.com/s?k=Pokemon+Perfect+Order+Elite+Trainer+Box",
+      target: "https://www.target.com/s?searchTerm=pokemon+perfect+order+elite+trainer+box",
+      "pokemon-center": "https://www.pokemoncenter.com/search/perfect%20order%20elite%20trainer",
+    },
+  },
+  {
+    id: "p-me3-bundle",
+    name: "Perfect Order Booster Bundle",
+    setCode: "me3",
+    category: "booster_bundle",
+    retailerSkus: {},
+    retailerUrls: {
+      amazon: "https://www.amazon.com/s?k=Pokemon+Perfect+Order+Booster+Bundle",
+    },
+  },
+  {
+    id: "p-me2-etb",
+    name: "Phantasmal Flames Elite Trainer Box",
+    setCode: "me2",
+    category: "etb",
+    retailerSkus: {},
+    retailerUrls: {
+      amazon: "https://www.amazon.com/s?k=Pokemon+Phantasmal+Flames+Elite+Trainer+Box",
+      target: "https://www.target.com/s?searchTerm=phantasmal+flames+elite+trainer+box",
+    },
+  },
+  {
+    id: "p-me2pt5-etb",
+    name: "Ascended Heroes Elite Trainer Box",
+    setCode: "me2pt5",
+    category: "etb",
+    retailerSkus: {},
+    retailerUrls: {
+      amazon: "https://www.amazon.com/s?k=Pokemon+Ascended+Heroes+Elite+Trainer+Box",
+    },
+  },
+  {
+    id: "p-sv10-etb",
+    name: "Destined Rivals Elite Trainer Box",
+    setCode: "sv10",
+    category: "etb",
+    retailerSkus: {},
+    retailerUrls: {
+      amazon: "https://www.amazon.com/s?k=Pokemon+Destined+Rivals+Elite+Trainer+Box",
+      target: "https://www.target.com/s?searchTerm=destined+rivals+elite+trainer+box",
+    },
+  },
+  {
+    id: "p-sv9-etb",
+    name: "Journey Together Elite Trainer Box",
+    setCode: "sv9",
+    category: "etb",
+    retailerSkus: {},
+    retailerUrls: {
+      amazon: "https://www.amazon.com/s?k=Pokemon+Journey+Together+Elite+Trainer+Box",
+    },
+  },
+  {
+    id: "p-black-bolt-etb",
+    name: "Black Bolt Elite Trainer Box",
+    setCode: "zsv10pt5",
+    category: "etb",
+    retailerSkus: {},
+    retailerUrls: {
+      amazon: "https://www.amazon.com/s?k=Pokemon+Black+Bolt+Elite+Trainer+Box",
+    },
+  },
+  {
+    id: "p-white-flare-etb",
+    name: "White Flare Elite Trainer Box",
+    setCode: "rsv10pt5",
+    category: "etb",
+    retailerSkus: {},
+    retailerUrls: {
+      amazon: "https://www.amazon.com/s?k=Pokemon+White+Flare+Elite+Trainer+Box",
+    },
+  },
   {
     id: "p-sv8-etb",
     name: "Surging Sparks Elite Trainer Box",

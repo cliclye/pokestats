@@ -1,4 +1,4 @@
-import type { TrackedProduct } from "../types";
+import type { RetailerSlug, TrackedProduct } from "../types";
 
 export type ProductCategory =
   | "etb"
@@ -20,7 +20,16 @@ export const CATEGORY_LABELS: Record<ProductCategory, string> = {
 };
 
 export const SET_CATALOG: Array<{ code: string; label: string; match: RegExp }> = [
-  { code: "me1", label: "Mega Evolution", match: /\bmega\s*evolution\b|\bperfect\s*order\b/i },
+  { code: "me5", label: "Pitch Black", match: /\bpitch\s*black\b/i },
+  { code: "me4", label: "Chaos Rising", match: /\bchaos\s*rising\b/i },
+  { code: "me3", label: "Perfect Order", match: /\bperfect\s*order\b/i },
+  { code: "me2pt5", label: "Ascended Heroes", match: /\bascended\s*heroes\b/i },
+  { code: "me2", label: "Phantasmal Flames", match: /\bphantasmal\s*flames\b/i },
+  { code: "me1", label: "Mega Evolution", match: /\bmega\s*evolution\b(?!\s*—|\s*-\s*pitch|\s*-\s*chaos)/i },
+  { code: "zsv10pt5", label: "Black Bolt", match: /\bblack\s*bolt\b/i },
+  { code: "rsv10pt5", label: "White Flare", match: /\bwhite\s*flare\b/i },
+  { code: "sv10", label: "Destined Rivals", match: /\bdestined\s*rivals\b/i },
+  { code: "sv9", label: "Journey Together", match: /\bjourney\s*together\b/i },
   { code: "sv8pt5", label: "Prismatic Evolutions", match: /\bprismatic\b/i },
   { code: "sv8", label: "Surging Sparks", match: /\bsurging\s*sparks\b/i },
   { code: "sv7", label: "Stellar Crown", match: /\bstellar\s*crown\b/i },
@@ -34,31 +43,40 @@ export const SET_CATALOG: Array<{ code: string; label: string; match: RegExp }> 
   { code: "sv2", label: "Paldea Evolved", match: /\bpaldea\s*evolved\b/i },
   { code: "sv1", label: "Scarlet & Violet", match: /\bscarlet\s*(&|and)\s*violet\b(?!\s*151)/i },
   { code: "swsh12pt5", label: "Crown Zenith", match: /\bcrown\s*zenith\b/i },
-  { code: "swsh12", label: "Silver Tempest", match: /\bsilver\s*tempest\b/i },
-  { code: "swsh11", label: "Lost Origin", match: /\blost\s*origin\b/i },
-  { code: "swsh10", label: "Astral Radiance", match: /\bastral\s*radiance\b/i },
-  { code: "swsh9", label: "Brilliant Stars", match: /\bbrilliant\s*stars\b/i },
-  { code: "swsh8", label: "Fusion Strike", match: /\bfusion\s*strike\b/i },
-  { code: "swsh7", label: "Evolving Skies", match: /\bevolving\s*skies\b/i },
   { code: "celebrations", label: "Celebrations", match: /\bcelebrations\b/i },
 ];
 
 const SEALED_PRODUCT_RE =
-  /\b(etb|elite\s*trainer|booster\s*box|booster\s*bundle|booster\s*pack|collection\s*box|upc|ultra\?\s*premium|tin|battle\s*deck|build\s*(&|and)\s*battle|poster\s*collection|tech\s*sticker|illustration\s*collection|premium\s*collection|special\s*collection)\b/i;
+  /\b(etb|elite\s*trainer\s*box|booster\s*box|booster\s*bundle|booster\s*display|blister|3-?\s*pack|collection\s*box|upc|ultra\s*premium|tin|battle\s*deck|build\s*(&|and)\s*battle|poster\s*collection|tech\s*sticker|illustration\s*collection|premium\s*collection|special\s*collection|ex\s*box|trainer\s*box)\b/i;
+
+const JUNK_PRODUCT_RE =
+  /\b(handbook|guide\s*book|album|portfolio|binder|sleeve|sleeves|board\s*game|guessing|plush|figure|hot\s*wheels|matchbox|diecast|pin\b|apparel|t-?shirt|hoodie|poster(?!\s*collection)|sticker(?!\s*collection)|coin(?!\s*flip)|keychain|mug|toy\s*car|die-?cast)\b/i;
 
 export function looksLikeSealedProduct(name: string): boolean {
+  if (!name) return false;
+  if (JUNK_PRODUCT_RE.test(name)) return false;
+  if (/\bebay\b/i.test(name)) return false;
   return SEALED_PRODUCT_RE.test(name);
+}
+
+/** Core packs/boxes users actually care about for stock hunting. */
+export function isCorePackOrBox(name: string, category?: ProductCategory | string | null): boolean {
+  if (JUNK_PRODUCT_RE.test(name)) return false;
+  if (category && ["etb", "booster_bundle", "booster_box", "tin", "collection", "battle_deck"].includes(category)) {
+    return !JUNK_PRODUCT_RE.test(name);
+  }
+  return looksLikeSealedProduct(name);
 }
 
 export function inferCategory(name: string): ProductCategory {
   const n = name.toLowerCase();
   if (/\belite\s*trainer|\betb\b/.test(n)) return "etb";
   if (/\bbooster\s*bundle\b/.test(n)) return "booster_bundle";
-  if (/\bbooster\s*box\b/.test(n)) return "booster_box";
+  if (/\bbooster\s*box\b|\bbooster\s*display\b/.test(n)) return "booster_box";
   if (/\bbattle\s*deck\b|\bbuild\s*(&|and)\s*battle\b/.test(n)) return "battle_deck";
   if (/\btin\b/.test(n)) return "tin";
   if (
-    /\b(collection|upc|ultra\s*premium|poster|illustration|tech\s*sticker|premium\s*collection)\b/.test(
+    /\b(collection|upc|ultra\s*premium|poster\s*collection|illustration|tech\s*sticker|premium\s*collection|ex\s*box)\b/.test(
       n,
     )
   ) {
@@ -84,12 +102,21 @@ export function enrichSignalName(
   productId: string | null;
   matchedProductName: string | null;
 } {
-  const matched = products.find((p) =>
-    productName.toLowerCase().includes(
-      p.name.toLowerCase().replace(/\s+/g, " ").slice(0, 24),
-    ),
-  );
-  const fromTracked = products.find((p) => p.id === matched?.id);
+  let best: { product: TrackedProduct; score: number } | null = null;
+  const n = productName.toLowerCase();
+  for (const p of products) {
+    const tokens = p.name
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, " ")
+      .split(/\s+/)
+      .filter((t) => t.length > 2 && !["the", "and", "box", "pokemon", "pokémon"].includes(t));
+    const hits = tokens.filter((t) => n.includes(t)).length;
+    const score = hits / Math.max(tokens.length, 1);
+    if (hits >= 2 && score >= 0.5) {
+      if (!best || score > best.score) best = { product: p, score };
+    }
+  }
+  const fromTracked = best?.product;
   const set = inferSet(productName);
   const category = fromTracked
     ? (fromTracked.category as ProductCategory)
@@ -109,10 +136,92 @@ export function enrichSignalName(
 
 export function categoryOptions(): Array<{ id: ProductCategory | "all"; label: string }> {
   return [
-    { id: "all", label: "All types" },
-    ...Object.entries(CATEGORY_LABELS).map(([id, label]) => ({
-      id: id as ProductCategory,
-      label,
-    })),
+    { id: "all", label: "All pack types" },
+    ...Object.entries(CATEGORY_LABELS)
+      .filter(([id]) => id !== "other")
+      .map(([id, label]) => ({
+        id: id as ProductCategory,
+        label,
+      })),
   ];
+}
+
+export function unwrapAffiliateUrl(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  try {
+    const u = new URL(raw);
+    // Skimlinks / similar wrappers
+    if (u.hostname.includes("skimresources") || u.hostname.includes("go.skim")) {
+      const inner = u.searchParams.get("url");
+      if (inner) return unwrapAffiliateUrl(decodeURIComponent(inner));
+    }
+    // Reject opaque deep-link shorteners that often misroute
+    if (
+      /mavely\.app\.link|bit\.ly|tinyurl\.com|t\.co|app\.link/i.test(u.hostname)
+    ) {
+      return null;
+    }
+    // Strip noisy affiliate tags but keep product path
+    if (/amazon\./i.test(u.hostname)) {
+      const dp = u.pathname.match(/\/(?:dp|gp\/product)\/([A-Z0-9]{10})/i);
+      if (dp) return `https://www.amazon.com/dp/${dp[1]}`;
+    }
+    if (/target\.com/i.test(u.hostname)) {
+      return `${u.origin}${u.pathname}`;
+    }
+    if (/walmart\.com|bestbuy\.com|gamestop\.com|pokemoncenter\.com/i.test(u.hostname)) {
+      return `${u.origin}${u.pathname}${u.search || ""}`.replace(/[?&](tag|linkCode|ref)=[^&]*/g, "");
+    }
+    if (/ebay\./i.test(u.hostname)) return null;
+    return raw;
+  } catch {
+    return null;
+  }
+}
+
+export function searchUrlForRetailer(retailer: RetailerSlug | null, productName: string): string | null {
+  if (!retailer || !productName) return null;
+  const q = encodeURIComponent(`Pokemon TCG ${productName}`);
+  switch (retailer) {
+    case "target":
+      return `https://www.target.com/s?searchTerm=${q}`;
+    case "walmart":
+      return `https://www.walmart.com/search?q=${q}`;
+    case "best-buy":
+      return `https://www.bestbuy.com/site/searchpage.jsp?st=${q}`;
+    case "gamestop":
+      return `https://www.gamestop.com/search/?q=${q}`;
+    case "pokemon-center":
+      return `https://www.pokemoncenter.com/search/${encodeURIComponent(productName)}`;
+    case "amazon":
+      return `https://www.amazon.com/s?k=${q}`;
+    default:
+      return null;
+  }
+}
+
+export function resolveProductUrl(opts: {
+  hrefs: string[];
+  retailerSlug: RetailerSlug | null;
+  productId: string | null;
+  productName: string;
+  products: TrackedProduct[];
+}): string | null {
+  if (opts.productId) {
+    const p = opts.products.find((x) => x.id === opts.productId);
+    const slug = opts.retailerSlug;
+    if (p && slug && p.retailerUrls[slug]) return p.retailerUrls[slug]!;
+  }
+  for (const href of opts.hrefs) {
+    const clean = unwrapAffiliateUrl(href);
+    if (!clean) continue;
+    if (
+      /target\.com|walmart\.com|bestbuy\.com|gamestop\.com|amazon\.com|pokemoncenter\.com/i.test(
+        clean,
+      )
+    ) {
+      return clean;
+    }
+  }
+  return searchUrlForRetailer(opts.retailerSlug, opts.productName);
 }

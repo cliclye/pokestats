@@ -69,32 +69,27 @@ function inferFromHtml(html: string): StockStatus {
 export async function pollTarget(product: TrackedProduct): Promise<PollResult> {
   const tcin = product.retailerSkus.target;
   if (!tcin) {
-    if (product.retailerUrls.target) {
-      const page = await fetchText(product.retailerUrls.target);
-      return {
-        retailerSlug: "target",
-        productId: product.id,
-        status: page.ok ? inferFromHtml(page.text) : "unknown",
-        quantity: null,
-        ok: page.ok,
-        note: page.ok ? "html_search" : `blocked:${page.status}`,
-      };
-    }
-    return { retailerSlug: "target", productId: product.id, status: "unknown", quantity: null, ok: false, note: "no sku" };
+    return {
+      retailerSlug: "target",
+      productId: product.id,
+      status: "unknown",
+      quantity: null,
+      ok: false,
+      note: product.retailerUrls.target ? "no_sku" : "no sku",
+    };
   }
   const url = `https://redsky.target.com/redsky_aggregations/v1/web/product_fulfillment_v1?key=ff457966e64d5e877fdbad070f276d18ecec4a01&tcin=${tcin}&store_id=3991&zip=10001`;
   const res = await fetchText(url);
   if (!res.ok) {
-    const page = product.retailerUrls.target
-      ? await fetchText(product.retailerUrls.target)
-      : res;
+    // Target HTML shells are unreliable (false "in stock" from SPA chrome).
+    // Prefer unknown over wrong links / status.
     return {
       retailerSlug: "target",
       productId: product.id,
-      status: page.ok ? inferFromHtml(page.text) : "unknown",
+      status: "unknown",
       quantity: null,
-      ok: page.ok,
-      note: page.ok ? "html_fallback" : `blocked:${res.status}`,
+      ok: false,
+      note: `api_blocked:${res.status}`,
     };
   }
   try {
@@ -116,20 +111,6 @@ export async function pollTarget(product: TrackedProduct): Promise<PollResult> {
     else if (raw.includes("OUT") || raw.includes("UNAVAILABLE")) status = "out";
     else if (raw.includes("LIMITED")) status = "limited";
 
-    if (status === "unknown" && product.retailerUrls.target) {
-      const page = await fetchText(product.retailerUrls.target);
-      if (page.ok) {
-        return {
-          retailerSlug: "target",
-          productId: product.id,
-          status: inferFromHtml(page.text),
-          quantity: null,
-          ok: true,
-          note: raw ? `${raw}+html` : "html_fallback",
-        };
-      }
-    }
-
     return { retailerSlug: "target", productId: product.id, status, quantity: null, ok: true, note: raw || "parsed" };
   } catch {
     return { retailerSlug: "target", productId: product.id, status: "unknown", quantity: null, ok: false, note: "parse_error" };
@@ -141,21 +122,44 @@ export async function pollWalmart(product: TrackedProduct): Promise<PollResult> 
   if (!url) {
     return { retailerSlug: "walmart", productId: product.id, status: "unknown", quantity: null, ok: false, note: "no url" };
   }
+  // Search pages are not reliable stock signals
+  if (/\/search\?/i.test(url)) {
+    return { retailerSlug: "walmart", productId: product.id, status: "unknown", quantity: null, ok: false, note: "search_url" };
+  }
   const res = await fetchText(url);
+  if (!res.ok) {
+    return {
+      retailerSlug: "walmart",
+      productId: product.id,
+      status: "unknown",
+      quantity: null,
+      ok: false,
+      note: `blocked:${res.status}`,
+    };
+  }
+  const status = inferFromHtml(res.text);
+  // Require strong out/in markers; otherwise unknown
   return {
     retailerSlug: "walmart",
     productId: product.id,
-    status: res.ok ? inferFromHtml(res.text) : "unknown",
+    status,
     quantity: null,
-    ok: res.ok,
-    note: res.ok ? "html" : `blocked:${res.status}`,
+    ok: true,
+    note: status === "unknown" ? "ambiguous_html" : "html",
   };
 }
 
 export async function pollPokemonCenter(product: TrackedProduct): Promise<PollResult> {
   const url = product.retailerUrls["pokemon-center"];
-  if (!url) {
-    return { retailerSlug: "pokemon-center", productId: product.id, status: "unknown", quantity: null, ok: false, note: "no url" };
+  if (!url || /\/search\/|\/category\//i.test(url)) {
+    return {
+      retailerSlug: "pokemon-center",
+      productId: product.id,
+      status: "unknown",
+      quantity: null,
+      ok: false,
+      note: url ? "search_url" : "no url",
+    };
   }
   const res = await fetchText(url);
   return {
@@ -170,8 +174,15 @@ export async function pollPokemonCenter(product: TrackedProduct): Promise<PollRe
 
 export async function pollBestBuy(product: TrackedProduct): Promise<PollResult> {
   const pageUrl = product.retailerUrls["best-buy"];
-  if (!pageUrl) {
-    return { retailerSlug: "best-buy", productId: product.id, status: "unknown", quantity: null, ok: false, note: "no url" };
+  if (!pageUrl || /searchpage\.jsp/i.test(pageUrl)) {
+    return {
+      retailerSlug: "best-buy",
+      productId: product.id,
+      status: "unknown",
+      quantity: null,
+      ok: false,
+      note: pageUrl ? "search_url" : "no url",
+    };
   }
   const res = await fetchText(pageUrl);
   return {
@@ -186,8 +197,15 @@ export async function pollBestBuy(product: TrackedProduct): Promise<PollResult> 
 
 export async function pollGameStop(product: TrackedProduct): Promise<PollResult> {
   const url = product.retailerUrls.gamestop;
-  if (!url) {
-    return { retailerSlug: "gamestop", productId: product.id, status: "unknown", quantity: null, ok: false, note: "no url" };
+  if (!url || /\/search\/?/i.test(url)) {
+    return {
+      retailerSlug: "gamestop",
+      productId: product.id,
+      status: "unknown",
+      quantity: null,
+      ok: false,
+      note: url ? "search_url" : "no url",
+    };
   }
   const res = await fetchText(url);
   return {
@@ -202,8 +220,15 @@ export async function pollGameStop(product: TrackedProduct): Promise<PollResult>
 
 export async function pollAmazon(product: TrackedProduct): Promise<PollResult> {
   const url = product.retailerUrls.amazon;
-  if (!url) {
-    return { retailerSlug: "amazon", productId: product.id, status: "unknown", quantity: null, ok: false, note: "no url" };
+  if (!url || /\/s\?/i.test(url)) {
+    return {
+      retailerSlug: "amazon",
+      productId: product.id,
+      status: "unknown",
+      quantity: null,
+      ok: false,
+      note: url ? "search_url" : "no url",
+    };
   }
   const res = await fetchText(url);
   return {

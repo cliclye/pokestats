@@ -1,5 +1,27 @@
 import type { RetailerSlug, TrackedProduct } from "../types";
 
+/** Big-box / official channels that typically sell sealed product near MSRP. */
+export const MSRP_RETAILERS: RetailerSlug[] = [
+  "target",
+  "walmart",
+  "best-buy",
+  "gamestop",
+  "pokemon-center",
+];
+
+export const MSRP_RETAILER_LABELS: Record<string, string> = {
+  target: "Target",
+  walmart: "Walmart",
+  "best-buy": "Best Buy",
+  gamestop: "GameStop",
+  "pokemon-center": "Pokémon Center",
+};
+
+export function isMsrpRetailer(slug: string | null | undefined): boolean {
+  if (!slug) return false;
+  return (MSRP_RETAILERS as string[]).includes(slug);
+}
+
 export type ProductCategory =
   | "etb"
   | "booster_bundle"
@@ -161,26 +183,23 @@ export function unwrapAffiliateUrl(raw: string | null | undefined): string | nul
     ) {
       return null;
     }
-    // Strip noisy affiliate tags but keep product path
-    if (/amazon\./i.test(u.hostname)) {
-      const dp = u.pathname.match(/\/(?:dp|gp\/product)\/([A-Z0-9]{10})/i);
-      if (dp) return `https://www.amazon.com/dp/${dp[1]}`;
-    }
+    if (/ebay\./i.test(u.hostname)) return null;
+    // Amazon/marketplace markup — not MSRP
+    if (/amazon\./i.test(u.hostname)) return null;
     if (/target\.com/i.test(u.hostname)) {
       return `${u.origin}${u.pathname}`;
     }
     if (/walmart\.com|bestbuy\.com|gamestop\.com|pokemoncenter\.com/i.test(u.hostname)) {
       return `${u.origin}${u.pathname}${u.search || ""}`.replace(/[?&](tag|linkCode|ref)=[^&]*/g, "");
     }
-    if (/ebay\./i.test(u.hostname)) return null;
-    return raw;
+    return null;
   } catch {
     return null;
   }
 }
 
 export function searchUrlForRetailer(retailer: RetailerSlug | null, productName: string): string | null {
-  if (!retailer || !productName) return null;
+  if (!retailer || !productName || !isMsrpRetailer(retailer)) return null;
   const q = encodeURIComponent(`Pokemon TCG ${productName}`);
   switch (retailer) {
     case "target":
@@ -193,8 +212,6 @@ export function searchUrlForRetailer(retailer: RetailerSlug | null, productName:
       return `https://www.gamestop.com/search/?q=${q}`;
     case "pokemon-center":
       return `https://www.pokemoncenter.com/search/${encodeURIComponent(productName)}`;
-    case "amazon":
-      return `https://www.amazon.com/s?k=${q}`;
     default:
       return null;
   }
@@ -216,7 +233,7 @@ export function resolveProductUrl(opts: {
     const clean = unwrapAffiliateUrl(href);
     if (!clean) continue;
     if (
-      /target\.com|walmart\.com|bestbuy\.com|gamestop\.com|amazon\.com|pokemoncenter\.com/i.test(
+      /target\.com|walmart\.com|bestbuy\.com|gamestop\.com|pokemoncenter\.com/i.test(
         clean,
       )
     ) {

@@ -247,7 +247,7 @@ const ADAPTERS: Partial<Record<RetailerSlug, (p: TrackedProduct) => Promise<Poll
   "pokemon-center": pollPokemonCenter,
   "best-buy": pollBestBuy,
   gamestop: pollGameStop,
-  amazon: pollAmazon,
+  // Amazon omitted — 3P marketplace pricing is often far above MSRP
 };
 
 async function mapPool<T, R>(

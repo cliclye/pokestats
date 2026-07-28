@@ -24,7 +24,7 @@ const RETAILER_ALIASES: Array<{ match: RegExp; slug: RetailerSlug }> = [
   { match: /\bbest\s*buy\b/i, slug: "best-buy" },
   { match: /\bgamestop\b/i, slug: "gamestop" },
   { match: /\bpok[eé]mon\s*center\b/i, slug: "pokemon-center" },
-  { match: /\bamazon\b/i, slug: "amazon" },
+  // Amazon / eBay intentionally omitted — marketplace markup, not MSRP
 ];
 
 function decodeHtml(s: string) {
@@ -115,17 +115,16 @@ function pickBuyUrl(
         const inner = u.searchParams.get("url");
         if (inner) {
           const decoded = decodeURIComponent(inner);
-          if (/walmart\.com|target\.com|bestbuy|gamestop|amazon|pokemoncenter/i.test(decoded)) {
+          if (
+            /walmart\.com|target\.com|bestbuy|gamestop|pokemoncenter/i.test(decoded) &&
+            !/amazon\./i.test(decoded)
+          ) {
             return decoded.split("?")[0];
           }
         }
         continue;
       }
-      if (/ebay\./i.test(u.hostname)) continue;
-      if (/amazon\.com/i.test(u.hostname)) {
-        const dp = u.pathname.match(/\/(?:dp|gp\/product)\/([A-Z0-9]{10})/i);
-        if (dp) return `https://www.amazon.com/dp/${dp[1]}`;
-      }
+      if (/ebay\.|amazon\./i.test(u.hostname)) continue;
       if (/target\.com|walmart\.com|bestbuy\.com|gamestop\.com|pokemoncenter\.com/i.test(u.hostname)) {
         return `${u.origin}${u.pathname}`;
       }
@@ -148,8 +147,6 @@ function pickBuyUrl(
       return `https://www.gamestop.com/search/?q=${q}`;
     case "pokemon-center":
       return `https://www.pokemoncenter.com/search/${encodeURIComponent(productName)}`;
-    case "amazon":
-      return `https://www.amazon.com/s?k=${q}`;
     default:
       return null;
   }
@@ -205,7 +202,12 @@ export async function scrapeNowInStock(
 
     const retailerSlug = parseRetailer(rest || text);
     if (!retailerSlug) continue;
-    if (/ebay/i.test(text) && retailerSlug !== "amazon") continue;
+    // Skip marketplace / reseller channels (Amazon, eBay, etc.)
+    if (/amazon|ebay|mercari|stockx|facebook|offerup|tigard|tcgplayer/i.test(text)) {
+      if (!/\btarget\b|\bwalmart\b|\bbest\s*buy\b|\bgamestop\b|\bpok[eé]mon\s*center\b/i.test(rest || text)) {
+        continue;
+      }
+    }
 
     const productId = matchProduct(productName, products);
     // Include URL in id salt so identical names across duplicate HTML rows stay unique

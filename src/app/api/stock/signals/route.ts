@@ -4,7 +4,9 @@ import {
   CATEGORY_LABELS,
   enrichSignalName,
   isCorePackOrBox,
+  isMsrpRetailer,
   looksLikeSealedProduct,
+  MSRP_RETAILERS,
   unwrapAffiliateUrl,
   type ProductCategory,
 } from "@/lib/stock/product-taxonomy";
@@ -29,6 +31,8 @@ export async function GET(request: Request) {
   const q = (searchParams.get("q") || "").trim().toLowerCase();
   const source = searchParams.get("source"); // e.g. nowinstock.net
   const sealedOnly = searchParams.get("sealed") !== "0";
+  // Default on: only MSRP big-box / official channels (no Amazon/eBay markup)
+  const msrpOnly = searchParams.get("msrp") !== "0";
   const limit = Math.min(Number(searchParams.get("limit") || 200), 400);
 
   const store = await readStore();
@@ -81,14 +85,19 @@ export async function GET(request: Request) {
   let signals: EnrichedWebSignal[] = [...fromPolls, ...fromWeb]
     .map((s) => ({
       ...s,
-      url: unwrapAffiliateUrl(s.url) || s.url,
+      url: unwrapAffiliateUrl(s.url) || (isMsrpRetailer(s.retailerSlug) ? s.url : null),
     }))
     // Drop opaque / junk links that previously sent users to unrelated pages
     .filter((s) => {
       if (!s.url) return true;
-      if (/mavely\.app\.link|bit\.ly|tinyurl|ebay\./i.test(s.url)) return false;
+      if (/mavely\.app\.link|bit\.ly|tinyurl|ebay\.|amazon\./i.test(s.url)) return false;
       return true;
     });
+
+  // MSRP-only: Target / Walmart / Best Buy / GameStop / Pokémon Center
+  if (msrpOnly) {
+    signals = signals.filter((s) => isMsrpRetailer(s.retailerSlug));
+  }
 
   // Default: only core sealed packs/boxes (ETB, booster, tin, collection) — no albums/handbooks/toys
   if (sealedOnly) {
@@ -153,9 +162,10 @@ export async function GET(request: Request) {
       url: unwrapAffiliateUrl(s.url) || s.url,
     }))
     .filter((s) => {
+      if (msrpOnly && !isMsrpRetailer(s.retailerSlug)) return false;
       if (!sealedOnly) return true;
       if (s.sourceSite.includes("reddit")) return false;
-      if (s.url && /mavely\.app\.link|ebay\./i.test(s.url)) return false;
+      if (s.url && /mavely\.app\.link|ebay\.|amazon\./i.test(s.url)) return false;
       return isCorePackOrBox(s.productName, s.category) || looksLikeSealedProduct(s.productName);
     });
 
@@ -165,7 +175,7 @@ export async function GET(request: Request) {
   for (const s of facetPool) {
     if (s.setCode && s.setLabel) setMap.set(s.setCode, s.setLabel);
     catSet.add(s.category);
-    if (s.retailerSlug) retailerSet.add(s.retailerSlug);
+    if (s.retailerSlug && isMsrpRetailer(s.retailerSlug)) retailerSet.add(s.retailerSlug);
   }
 
   return NextResponse.json({
@@ -185,8 +195,11 @@ export async function GET(request: Request) {
       sets: [...setMap.entries()]
         .map(([code, label]) => ({ code, label }))
         .sort((a, b) => a.label.localeCompare(b.label)),
-      retailers: [...retailerSet].sort(),
+      retailers: msrpOnly
+        ? [...MSRP_RETAILERS]
+        : [...retailerSet].sort(),
       sources: [...new Set(facetPool.map((s) => s.sourceSite))].sort(),
+      msrpOnly,
     },
     meta: {
       webSignalsSyncedAt: store.meta.webSignalsSyncedAt ?? null,
@@ -196,7 +209,7 @@ export async function GET(request: Request) {
       inStock: facetPool.filter((s) => s.status === "in_stock" || s.status === "limited")
         .length,
       autoCheck:
-        "Retailer sites + NowInStock are polled automatically about every 10–15 minutes. In-store shelves/vending still need a visit or community report.",
+        "MSRP retailers only (Target, Walmart, Best Buy, GameStop, Pokémon Center). Amazon/eBay and other markup marketplaces are excluded.",
     },
   });
 }

@@ -118,6 +118,7 @@ export function WebStockChecker() {
     const params = new URLSearchParams();
     params.set("limit", "300");
     params.set("sealed", "1");
+    params.set("msrp", "1");
     if (deferredQ.trim()) params.set("q", deferredQ.trim());
     if (category !== "all") params.set("category", category);
     if (setCode !== "all") params.set("set", setCode);
@@ -159,10 +160,10 @@ export function WebStockChecker() {
     <div className="mx-auto w-full max-w-6xl px-5 pb-16 md:px-8">
       <div className="panel rounded-3xl p-4 md:p-5">
         <div className="mb-4 rounded-2xl border border-[rgba(92,255,176,0.22)] bg-[rgba(92,255,176,0.06)] px-4 py-3 text-sm text-[var(--fog)]">
-          <p className="font-medium text-[var(--electric)]">Automatic stock checks are on</p>
+          <p className="font-medium text-[var(--electric)]">MSRP retailers only</p>
           <p className="mt-1 text-[var(--muted)]">
             {meta?.autoCheck ||
-              "Retailer websites and NowInStock are scraped on a schedule — you don’t need to fill the report form for online stock."}
+              "Shows Target, Walmart, Best Buy, GameStop, and Pokémon Center — not Amazon/eBay reseller markup."}
           </p>
           <p className="mt-1 text-xs text-[var(--muted)]">
             Last web scrape:{" "}

@@ -176,3 +176,18 @@ a {
 .maplibregl-ctrl button {
   background-color: transparent !important;
 }
+
+@keyframes stock-swipe-in {
+  from {
+    opacity: 0;
+    transform: translateX(28px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.stock-swipe-card {
+  animation: stock-swipe-in 0.45s ease both;
+}

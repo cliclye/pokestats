@@ -1,6 +1,6 @@
 "use client";
 
-import { useDeferredValue, useEffect, useMemo, useState, useTransition } from "react";
+import { useDeferredValue, useEffect, useMemo, useState, useTransition, type FormEvent } from "react";
 import type { StockStatus } from "@/lib/types";
 import {
   CATEGORY_LABELS,
@@ -101,6 +101,15 @@ export function WebStockChecker() {
   const [status, setStatus] = useState<"all" | "in_stock" | "out" | "limited">("all");
   const [source, setSource] = useState("all");
   const [tick, setTick] = useState(0);
+  const [slide, setSlide] = useState(0);
+  const [secondsLeft, setSecondsLeft] = useState(30);
+
+  const [alertPhone, setAlertPhone] = useState("");
+  const [alertSets, setAlertSets] = useState<string[]>([]);
+  const [alertBusy, setAlertBusy] = useState(false);
+  const [alertMsg, setAlertMsg] = useState<string | null>(null);
+  const [alertErr, setAlertErr] = useState<string | null>(null);
+  const [smsReady, setSmsReady] = useState<boolean | null>(null);
 
   const productChoices = useMemo(() => {
     let list = products;
@@ -109,9 +118,42 @@ export function WebStockChecker() {
     return list;
   }, [products, category, setCode]);
 
+  const inStockHighlights = useMemo(
+    () =>
+      signals.filter((s) => s.status === "in_stock" || s.status === "limited").slice(0, 20),
+    [signals],
+  );
+
   useEffect(() => {
-    const id = setInterval(() => setTick((t) => t + 1), 60_000);
+    const id = setInterval(() => setTick((t) => t + 1), 30_000);
     return () => clearInterval(id);
+  }, []);
+
+  useEffect(() => {
+    setSecondsLeft(30);
+    const id = setInterval(() => {
+      setSecondsLeft((s) => (s <= 1 ? 30 : s - 1));
+    }, 1000);
+    return () => clearInterval(id);
+  }, [tick]);
+
+  useEffect(() => {
+    if (!inStockHighlights.length) {
+      setSlide(0);
+      return;
+    }
+    setSlide((s) => s % inStockHighlights.length);
+    const id = setInterval(() => {
+      setSlide((s) => (s + 1) % inStockHighlights.length);
+    }, 30_000);
+    return () => clearInterval(id);
+  }, [inStockHighlights.length]);
+
+  useEffect(() => {
+    fetch("/api/alerts")
+      .then((r) => r.json())
+      .then((j) => setSmsReady(Boolean(j.smsReady)))
+      .catch(() => setSmsReady(null));
   }, []);
 
   useEffect(() => {
@@ -154,10 +196,185 @@ export function WebStockChecker() {
     return () => controller.abort();
   }, [deferredQ, category, setCode, productId, retailer, status, source, tick]);
 
+  async function saveAlert(e: FormEvent) {
+    e.preventDefault();
+    setAlertBusy(true);
+    setAlertErr(null);
+    setAlertMsg(null);
+    try {
+      const res = await fetch("/api/alerts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: alertPhone, setCodes: alertSets }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
+      setAlertMsg(json.message || "Reminder saved.");
+      if (typeof json.smsReady === "boolean") setSmsReady(json.smsReady);
+      try {
+        localStorage.setItem("pokestats-alert-token", json.unsubscribeToken || "");
+      } catch {
+        /* ignore */
+      }
+    } catch (err) {
+      setAlertErr(err instanceof Error ? err.message : "Could not save reminder");
+    } finally {
+      setAlertBusy(false);
+    }
+  }
+
+  function toggleAlertSet(code: string) {
+    setAlertSets((prev) =>
+      prev.includes(code) ? prev.filter((c) => c !== code) : [...prev, code].slice(0, 12),
+    );
+  }
+
   const cats = categoryOptions();
+  const activeSlide = inStockHighlights[slide] || null;
 
   return (
     <div className="mx-auto w-full max-w-6xl px-5 pb-16 md:px-8">
+      {activeSlide && (
+        <div className="stock-swipe panel mb-5 overflow-hidden rounded-3xl">
+          <div className="flex items-center justify-between px-4 pt-4 md:px-5">
+            <p className="text-xs uppercase tracking-[0.2em] text-[var(--electric-dim)]">
+              In stock now · auto-swipe {secondsLeft}s
+            </p>
+            <div className="flex gap-1.5">
+              {inStockHighlights.map((s, i) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  aria-label={`Show listing ${i + 1}`}
+                  onClick={() => setSlide(i)}
+                  className={`h-1.5 w-1.5 rounded-full transition-all ${
+                    i === slide ? "w-4 bg-[var(--electric)]" : "bg-[var(--muted)]/50"
+                  }`}
+                />
+              ))}
+            </div>
+          </div>
+          <div className="relative min-h-[140px]">
+            <div
+              key={activeSlide.id}
+              className="stock-swipe-card flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between md:p-5"
+            >
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span
+                    className="rounded-full px-2.5 py-0.5 text-[11px] font-semibold"
+                    style={{
+                      background: statusTone(activeSlide.status).bg,
+                      color: statusTone(activeSlide.status).fg,
+                      border: `1px solid ${statusTone(activeSlide.status).border}`,
+                    }}
+                  >
+                    {statusLabel(activeSlide.status)}
+                  </span>
+                  <span className="text-[11px] uppercase tracking-[0.14em] text-[var(--muted)]">
+                    {retailerLabel(activeSlide.retailerSlug)}
+                  </span>
+                  {activeSlide.setLabel && (
+                    <span className="rounded-full border border-[var(--stroke)] px-2 py-0.5 text-[11px] text-[var(--fog)]/80">
+                      {activeSlide.setLabel}
+                    </span>
+                  )}
+                </div>
+                <h3 className="font-display mt-2 text-2xl text-[var(--fog)] md:text-3xl">
+                  {activeSlide.productName}
+                </h3>
+                <p className="mt-1 text-xs text-[var(--muted)]">
+                  via {activeSlide.sourceSite}
+                  {activeSlide.observedAt
+                    ? ` · ${new Date(activeSlide.observedAt).toLocaleString()}`
+                    : ""}
+                </p>
+              </div>
+              {activeSlide.url ? (
+                <a
+                  href={activeSlide.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn-primary shrink-0 px-4 py-2 text-sm"
+                >
+                  Buy now
+                </a>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      )}
+
+      <form
+        onSubmit={saveAlert}
+        className="panel mb-5 rounded-3xl p-4 md:p-5"
+      >
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <p className="text-xs uppercase tracking-[0.2em] text-[var(--amber)]">
+              Text reminder
+            </p>
+            <h2 className="font-display mt-1 text-2xl text-[var(--fog)]">
+              Ping me when my sets restock
+            </h2>
+            <p className="mt-1 max-w-xl text-sm text-[var(--muted)]">
+              We’ll text you when selected sets show in stock at Target, Walmart, Best Buy,
+              GameStop, or Pokémon Center.
+            </p>
+          </div>
+          {smsReady === false && (
+            <p className="text-xs text-[var(--amber)]">
+              SMS gateway not configured yet — reminders still save.
+            </p>
+          )}
+        </div>
+
+        <div className="mt-4 grid gap-3 md:grid-cols-[1fr_auto]">
+          <label className="block text-xs text-[var(--muted)]">
+            Mobile number
+            <input
+              type="tel"
+              inputMode="tel"
+              autoComplete="tel"
+              value={alertPhone}
+              onChange={(e) => setAlertPhone(e.target.value)}
+              placeholder="(555) 123-4567"
+              required
+              className="mt-1 w-full rounded-xl border border-[var(--stroke)] bg-[rgba(0,0,0,0.25)] px-3 py-2.5 text-sm text-[var(--fog)] outline-none ring-[var(--electric)] placeholder:text-[var(--muted)] focus:ring-1"
+            />
+          </label>
+          <button
+            type="submit"
+            disabled={alertBusy || alertSets.length === 0}
+            className="btn-primary self-end px-5 py-2.5 text-sm disabled:opacity-50"
+          >
+            {alertBusy ? "Saving…" : "Enable texts"}
+          </button>
+        </div>
+
+        <div className="mt-3 flex flex-wrap gap-2">
+          {facets.sets.map((s) => {
+            const on = alertSets.includes(s.code);
+            return (
+              <button
+                key={s.code}
+                type="button"
+                onClick={() => toggleAlertSet(s.code)}
+                className={`rounded-full px-3 py-1.5 text-xs transition-colors ${
+                  on
+                    ? "bg-[rgba(255,200,87,0.18)] text-[var(--amber)]"
+                    : "border border-[var(--stroke)] text-[var(--muted)] hover:text-[var(--fog)]"
+                }`}
+              >
+                {s.label}
+              </button>
+            );
+          })}
+        </div>
+        {alertMsg && <p className="mt-3 text-sm text-[var(--electric)]">{alertMsg}</p>}
+        {alertErr && <p className="mt-3 text-sm text-[var(--coral)]">{alertErr}</p>}
+      </form>
+
       <div className="panel rounded-3xl p-4 md:p-5">
         <div className="mb-4 rounded-2xl border border-[rgba(92,255,176,0.22)] bg-[rgba(92,255,176,0.06)] px-4 py-3 text-sm text-[var(--fog)]">
           <p className="font-medium text-[var(--electric)]">MSRP retailers only</p>
@@ -188,7 +405,7 @@ export function WebStockChecker() {
             <p>
               {meta?.inStock ?? 0} in stock / limited · {meta?.pool ?? 0} sealed listings
             </p>
-            <p>{pending ? "Updating…" : "Auto-refreshes every minute"}</p>
+            <p>{pending ? "Updating…" : `Auto-refreshes in ${secondsLeft}s`}</p>
           </div>
         </div>
 

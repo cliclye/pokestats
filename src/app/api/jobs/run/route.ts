@@ -3,11 +3,12 @@ import { upsertSetsAndCards, upsertSnapshots, upsertWebSignals, readStore } from
 import { pollAllProducts, resultsToSnapshots } from "@/lib/stock/adapters";
 import { collectWebSignals, signalsToSnapshots } from "@/lib/stock/web-signals";
 import { syncRecentSets } from "@/lib/pokemontcg";
+import { processStockAlerts } from "@/lib/alerts";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
-type JobName = "stock" | "prices" | "signals";
+type JobName = "stock" | "prices" | "signals" | "alerts";
 
 function authorized(request: Request) {
   const secret = process.env.JOBS_SECRET || process.env.CRON_SECRET || "dev-local-secret";
@@ -36,17 +37,30 @@ async function runJob(job: JobName, setLimit = 4) {
     };
   }
 
+  if (job === "alerts") {
+    const alerts = await processStockAlerts({
+      signals: store.webSignals || [],
+      products: store.products,
+    });
+    return { ok: true as const, job, ...alerts, at: new Date().toISOString() };
+  }
+
   if (job === "signals") {
     const signals = await collectWebSignals(store.products);
     const retailerIdBySlug = new Map(store.retailers.map((r) => [r.slug, r.id]));
     const snaps = signalsToSnapshots(signals, store.locations, retailerIdBySlug);
     await upsertWebSignals(signals, snaps);
+    const alerts = await processStockAlerts({
+      signals,
+      products: store.products,
+    });
     return {
       ok: true as const,
       job,
       signals: signals.length,
       inStock: signals.filter((s) => s.status === "in_stock").length,
       snapshots: snaps.length,
+      alerts,
       at: new Date().toISOString(),
     };
   }
@@ -64,6 +78,11 @@ async function runJob(job: JobName, setLimit = 4) {
   const webSnaps = signalsToSnapshots(signals, store.locations, retailerIdBySlug);
   await upsertWebSignals(signals, webSnaps);
 
+  const alerts = await processStockAlerts({
+    signals,
+    products: store.products,
+  });
+
   return {
     ok: true as const,
     job,
@@ -72,6 +91,7 @@ async function runJob(job: JobName, setLimit = 4) {
     inStock: results.filter((r) => r.status === "in_stock" || r.status === "limited").length,
     signals: signals.length,
     signalInStock: signals.filter((s) => s.status === "in_stock").length,
+    alerts,
     results: results.map((r) => ({
       retailer: r.retailerSlug,
       productId: r.productId,
@@ -88,7 +108,7 @@ export async function GET(request: Request) {
   }
   const { searchParams } = new URL(request.url);
   const job = (searchParams.get("job") || "signals") as JobName;
-  if (!["stock", "prices", "signals"].includes(job)) {
+  if (!["stock", "prices", "signals", "alerts"].includes(job)) {
     return NextResponse.json({ error: "invalid job" }, { status: 400 });
   }
   const setLimit = Number(searchParams.get("setLimit") || 4);
@@ -118,7 +138,7 @@ export async function POST(request: Request) {
       setLimit?: number;
     };
     const job = body.job || "stock";
-    if (!["stock", "prices", "signals"].includes(job)) {
+    if (!["stock", "prices", "signals", "alerts"].includes(job)) {
       return NextResponse.json({ error: "invalid job" }, { status: 400 });
     }
     const result = await runJob(job, body.setLimit ?? 4);

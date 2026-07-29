@@ -10,7 +10,7 @@
       "schedule": "0 15 * * *"
     },
     {
-      "path": "/api/jobs/run?job=prices&setLimit=4",
+      "path": "/api/jobs/run?job=prices&setLimit=2",
       "schedule": "0 16 * * *"
     }
   ]

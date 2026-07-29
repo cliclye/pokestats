@@ -8,17 +8,31 @@ on:
 jobs:
   sync:
     runs-on: ubuntu-latest
+    timeout-minutes: 8
     steps:
       - name: Trigger production price sync
         env:
           APP_URL: ${{ secrets.APP_URL }}
           JOBS_SECRET: ${{ secrets.JOBS_SECRET }}
         run: |
-          if [ -z "$APP_URL" ] || [ -z "$JOBS_SECRET" ]; then
+          set -euo pipefail
+          if [ -z "${APP_URL:-}" ] || [ -z "${JOBS_SECRET:-}" ]; then
             echo "Set APP_URL and JOBS_SECRET repo secrets"
             exit 1
           fi
-          curl -fsS -X POST "$APP_URL/api/jobs/run" \
+          echo "Running price sync against $APP_URL"
+          # Sync 2 newest sets per run (runs every 4h) to avoid Vercel 504s.
+          # --max-time must stay under typical gateway limits (~300s).
+          RESP_FILE="$(mktemp)"
+          HTTP_CODE=$(curl -sS --max-time 280 -o "$RESP_FILE" -w "%{http_code}" -X POST "$APP_URL/api/jobs/run" \
             -H "Content-Type: application/json" \
             -H "x-jobs-secret: $JOBS_SECRET" \
-            -d '{"job":"prices","setLimit":4}'
+            -d '{"job":"prices","setLimit":2}')
+          echo "HTTP $HTTP_CODE"
+          cat "$RESP_FILE"
+          echo
+          if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
+            echo "Price sync failed with HTTP $HTTP_CODE"
+            exit 1
+          fi
+          echo "Price sync complete"

@@ -26,13 +26,21 @@ async function runJob(job: JobName, setLimit = 4) {
   const store = await readStore();
 
   if (job === "prices") {
-    const { sets, cards } = await syncRecentSets(setLimit);
+    // Keep cron under ~2–3 min: fewer sets + capped TCGPlayer enrichment.
+    const { sets, cards, syncedSetIds, errors } = await syncRecentSets(setLimit, {
+      enrichMissingLimit: 35,
+      enrichConcurrency: 3,
+      enrichDelayMs: 60,
+    });
+    // Persist set catalog even if card enrichment partially fails.
     await upsertSetsAndCards(sets, cards);
     return {
       ok: true as const,
       job,
       sets: sets.length,
       cards: cards.length,
+      syncedSetIds,
+      errors,
       at: new Date().toISOString(),
     };
   }

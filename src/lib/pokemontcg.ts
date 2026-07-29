@@ -1,5 +1,8 @@
 import type { Card, CardPriceVariant, CardSet } from "./types";
-import { enrichCardsFromTcgplayer } from "./tcgplayer";
+import {
+  cardHasPricedVariant,
+  enrichCardsFromTcgplayer,
+} from "./tcgplayer";
 
 const BASE = "https://api.pokemontcg.io/v2";
 
@@ -36,6 +39,13 @@ interface PtcgCard {
     >;
   };
 }
+
+export type SyncSetsOptions = {
+  /** Max cards missing pokemontcg prices to enrich via TCGPlayer per set. */
+  enrichMissingLimit?: number;
+  enrichConcurrency?: number;
+  enrichDelayMs?: number;
+};
 
 function headers(): HeadersInit {
   const h: Record<string, string> = { Accept: "application/json" };
@@ -98,7 +108,10 @@ function mapPrices(
   return { variants, updatedAt: prices.updatedAt ?? null };
 }
 
-export async function fetchCardsForSet(setId: string): Promise<Card[]> {
+export async function fetchCardsForSet(
+  setId: string,
+  opts: SyncSetsOptions = {},
+): Promise<Card[]> {
   const cards: Card[] = [];
   let page = 1;
   let totalCount = Infinity;
@@ -128,8 +141,28 @@ export async function fetchCardsForSet(setId: string): Promise<Card[]> {
     page += 1;
     await new Promise((r) => setTimeout(r, 250));
   }
+
   // Newer sets often have tcgplayer.url but no prices on pokemontcg.io yet.
-  return enrichCardsFromTcgplayer(cards);
+  // Cap enrichment so cron jobs finish before Vercel gateway timeouts (504).
+  const enrichMissingLimit = opts.enrichMissingLimit ?? 40;
+  if (enrichMissingLimit <= 0) return cards;
+
+  const missingIdx: number[] = [];
+  for (let i = 0; i < cards.length; i++) {
+    if (!cardHasPricedVariant(cards[i])) missingIdx.push(i);
+  }
+  const sliceIdx = missingIdx.slice(0, enrichMissingLimit);
+  if (!sliceIdx.length) return cards;
+
+  const toEnrich = sliceIdx.map((i) => cards[i]);
+  const enriched = await enrichCardsFromTcgplayer(toEnrich, {
+    concurrency: opts.enrichConcurrency ?? 3,
+    delayMs: opts.enrichDelayMs ?? 80,
+  });
+  for (let j = 0; j < sliceIdx.length; j++) {
+    cards[sliceIdx[j]] = enriched[j];
+  }
+  return cards;
 }
 
 export async function searchCardsLive(query: string, pageSize = 40): Promise<Card[]> {
@@ -158,19 +191,32 @@ export async function searchCardsLive(query: string, pageSize = 40): Promise<Car
   return enrichCardsFromTcgplayer(cards, { concurrency: 3, delayMs: 80 });
 }
 
-export async function syncRecentSets(limit = 8): Promise<{ sets: CardSet[]; cards: Card[] }> {
+export async function syncRecentSets(
+  limit = 8,
+  opts: SyncSetsOptions = {},
+): Promise<{ sets: CardSet[]; cards: Card[]; syncedSetIds: string[]; errors: string[] }> {
   const allSets = await fetchAllSets();
   const sets = allSets.slice(0, limit);
   const cards: Card[] = [];
+  const syncedSetIds: string[] = [];
+  const errors: string[] = [];
+
   for (const set of sets) {
     try {
-      const setCards = await fetchCardsForSet(set.id);
+      const setCards = await fetchCardsForSet(set.id, {
+        enrichMissingLimit: opts.enrichMissingLimit ?? 40,
+        enrichConcurrency: opts.enrichConcurrency ?? 3,
+        enrichDelayMs: opts.enrichDelayMs ?? 80,
+      });
       cards.push(...setCards);
+      syncedSetIds.push(set.id);
       console.log(`Synced ${set.name}: ${setCards.length} cards`);
     } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
       console.warn(`Skipping set ${set.id} (${set.name}):`, err);
+      errors.push(`${set.id}: ${msg}`);
     }
-    await new Promise((r) => setTimeout(r, 500));
+    await new Promise((r) => setTimeout(r, 400));
   }
-  return { sets: allSets, cards };
+  return { sets: allSets, cards, syncedSetIds, errors };
 }
